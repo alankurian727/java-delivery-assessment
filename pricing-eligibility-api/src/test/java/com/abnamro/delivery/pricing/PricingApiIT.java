@@ -88,6 +88,16 @@ class PricingApiIT {
     }
 
     @Test
+    void rejectsFractionalWeight() throws Exception {
+        ResponseEntity<String> response = post("""
+                {"requestId":"%s","originPostalCode":"1012AB","destinationPostalCode":"5611EM",
+                 "weightInGrams":2750.5,"deliveryType":"NEXT_DAY"}""".formatted(REQUEST_ID), new HttpHeaders());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(json(response).get("code").asText()).isEqualTo("VALIDATION_FAILED");
+    }
+
+    @Test
     void rejectsMissingField() throws Exception {
         String body = """
                 {"requestId":"%s","originPostalCode":"1012AB","weightInGrams":2750,"deliveryType":"NEXT_DAY"}"""

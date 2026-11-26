@@ -8,6 +8,8 @@ spring:
     default-property-inclusion: non_null
     deserialization:
       use-big-decimal-for-floats: true
+      # weightInGrams is an integer in the contract: reject 2750.5 with 400 instead of truncating it to 2750.
+      accept-float-as-int: false
     generator:
       write-bigdecimal-as-plain: true
 
