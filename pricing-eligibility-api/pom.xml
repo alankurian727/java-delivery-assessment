@@ -21,6 +21,7 @@
         <springdoc.version>2.8.16</springdoc.version>
         <openapi-generator.version>7.12.0</openapi-generator.version>
         <mapstruct.version>1.6.3</mapstruct.version>
+        <jacoco.version>0.8.12</jacoco.version>
         <contracts.dir>${project.basedir}/../docs/openapi</contracts.dir>
     </properties>
 
@@ -122,6 +123,34 @@
                         <goals>
                             <goal>integration-test</goal>
                             <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Coverage of unit and integration tests: target/site/jacoco/index.html after mvn verify. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <configuration>
+                    <excludes>
+                        <!-- Generated from the OpenAPI contract and by MapStruct. -->
+                        <exclude>com/abnamro/delivery/pricing/api/**</exclude>
+                        <exclude>**/*MapperImpl.class</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
                         </goals>
                     </execution>
                 </executions>
