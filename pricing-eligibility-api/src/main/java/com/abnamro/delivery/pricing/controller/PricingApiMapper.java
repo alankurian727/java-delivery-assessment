@@ -49,9 +49,6 @@ public interface PricingApiMapper {
     @Mapping(target = "currency", constant = "EUR")
     com.abnamro.delivery.pricing.api.model.Money toApiMoney(Money money);
 
-    com.abnamro.delivery.pricing.api.model.PriceComponent toApiPriceComponent(
-            com.abnamro.delivery.pricing.domain.PriceComponent component);
-
     default PostalCode toPostalCode(String raw) {
         return PostalCode.of(raw);
     }
