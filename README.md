@@ -7,6 +7,31 @@ Two independently buildable Java 21 and Spring Boot services.
 | `delivery-order-api` | 8080 | Delivery order HTTP API, PostgreSQL persistence, and pricing client |
 | `pricing-eligibility-api` | 8081 | Stateless pricing and eligibility evaluation |
 
+## Run with Docker Compose
+
+With Docker running, set a local PostgreSQL password in the repository root's
+`.env` file. Git ignores this file.
+
+```dotenv
+DELIVERY_DB_PASSWORD=replace-with-a-local-password
+```
+
+From the repository root, start the stack and check both APIs:
+
+```sh
+docker compose up --build --wait
+curl -fsS http://localhost:8080/actuator/health
+curl -fsS http://localhost:8081/actuator/health
+```
+
+Both health endpoints should return `{"status":"UP"}`. Compose builds both
+services with their Maven wrappers and starts PostgreSQL on the Compose network.
+
+Use `docker compose logs -f` to view logs and `docker compose down` to stop the
+stack. PostgreSQL data persists in the named volume.
+
+## Build and run with Maven
+
 Each service has its own Maven wrapper. A local Maven installation is optional.
 
 ```sh
