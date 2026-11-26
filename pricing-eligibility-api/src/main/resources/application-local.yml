@@ -1,5 +1,7 @@
-# Developer machine: detailed application logs.
+# Developer machine (default profile).
 logging:
+  # No structured format here: plain text is easier to read in a terminal. dev and prod log JSON.
   level:
     root: INFO
+    # Shows the rule-by-rule DEBUG lines for each evaluation.
     com.abnamro.delivery: DEBUG
