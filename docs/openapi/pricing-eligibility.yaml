@@ -101,12 +101,14 @@ components:
         originPostalCode:
           type: string
           pattern: ^[1-9][0-9]{3} ?[A-Za-z]{2}$
-          description: Dutch postal code, with or without a space (e.g. 1012AB or 1012 AB).
+          description: Dutch postal code, with or without a space (e.g. 1012AB or 1012 AB). Case-insensitive;
+            normalized to uppercase without a space (1012AB) before pricing and idempotency comparison.
           example: 1012 AB
         destinationPostalCode:
           type: string
           pattern: ^[1-9][0-9]{3} ?[A-Za-z]{2}$
-          description: Dutch postal code, with or without a space (e.g. 1012AB or 1012 AB).
+          description: Dutch postal code, with or without a space (e.g. 1012AB or 1012 AB). Case-insensitive;
+            normalized to uppercase without a space (1012AB) before pricing and idempotency comparison.
           example: 1012 AB
         weightInGrams:
           type: integer
@@ -236,6 +238,8 @@ components:
           format: uri-reference
         code:
           type: string
+          description: 'Machine-readable code identifying the error. Known values: VALIDATION_FAILED,
+            INTERNAL_ERROR. Clients must tolerate new values.'
           example: VALIDATION_FAILED
         correlationId:
           type: string
@@ -251,4 +255,5 @@ components:
                 type: string
               message:
                 type: string
-      description: Error details in RFC 9457 Problem Details format.
+      description: Error details in RFC 9457 Problem Details format. Never includes raw request input,
+        personal data, stack traces, database details, internal hostnames or Java class names.
