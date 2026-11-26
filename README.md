@@ -36,6 +36,12 @@ aggregator POM and the root Maven wrapper:
 ./mvnw clean verify
 ```
 
+The root POM and wrapper provide a convenience build for local development.
+Each service owns its POM, produces a separate executable JAR, and has its own
+Dockerfile. For production, build, version, and deploy each service's artifact
+separately. Configure PostgreSQL and the Pricing endpoint for Delivery Order in
+the deployment environment.
+
 To build either service independently, point its wrapper at its own POM:
 
 ```sh
