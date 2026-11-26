@@ -1,0 +1,6 @@
+# Docker builds use the repository root as context; send only what the images need.
+*
+!docs/openapi/
+!delivery-order-api/
+!pricing-eligibility-api/
+**/target/

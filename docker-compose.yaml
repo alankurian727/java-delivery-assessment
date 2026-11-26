@@ -14,7 +14,9 @@ services:
       retries: 10
 
   pricing-eligibility-api:
-    build: ./pricing-eligibility-api
+    build:
+      context: .
+      dockerfile: pricing-eligibility-api/Dockerfile
     ports:
       - "127.0.0.1:8081:8081"
     healthcheck:
@@ -24,7 +26,9 @@ services:
       retries: 10
 
   delivery-order-api:
-    build: ./delivery-order-api
+    build:
+      context: .
+      dockerfile: delivery-order-api/Dockerfile
     environment:
       DELIVERY_DB_URL: jdbc:postgresql://postgres:5432/delivery
       DELIVERY_DB_USER: delivery
