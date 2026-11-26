@@ -17,4 +17,14 @@ public record PostalCode(String value) {
     public static PostalCode of(String raw) {
         return new PostalCode(raw.replace(" ", "").toUpperCase(Locale.ROOT));
     }
+
+    /** The four-digit area, for example "1012" for "1012AB". */
+    public String digits() {
+        return value.substring(0, 4);
+    }
+
+    /** Inclusive range check. String order works because values are normalised and fixed-length. */
+    public boolean isWithin(PostalCode from, PostalCode to) {
+        return value.compareTo(from.value) >= 0 && value.compareTo(to.value) <= 0;
+    }
 }

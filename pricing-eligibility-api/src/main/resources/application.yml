@@ -8,6 +8,27 @@ spring:
     generator:
       write-bigdecimal-as-plain: true
 
+pricing:
+  tariff:
+    base-prices:
+      STANDARD: 4.95
+      NEXT_DAY: 6.95
+      SAME_DAY: 11.95
+    max-weight-in-grams: 20000
+    weight-bands:
+      - up-to-grams: 2000
+        surcharge: 0.00
+      - up-to-grams: 5000
+        surcharge: 1.00
+      - up-to-grams: 10000
+        surcharge: 2.50
+      - up-to-grams: 20000
+        surcharge: 5.00
+    urban-area:
+      from: 1000AA
+      to: 1099ZZ
+      surcharge: 1.00
+
 springdoc:
   swagger-ui:
     url: /openapi/pricing-eligibility.yaml
