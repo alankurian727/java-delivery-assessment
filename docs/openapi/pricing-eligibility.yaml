@@ -1,0 +1,264 @@
+openapi: 3.0.3
+info:
+  title: Pricing and Eligibility API
+  version: 1.0.0
+  description: Internal stateless API. Valid evaluations return HTTP 200 for both eligible and ineligible
+    results. No personal names or delivery order persistence.
+servers:
+- url: http://localhost:8081
+paths:
+  /api/v1/pricing/evaluations:
+    post:
+      operationId: evaluatePricing
+      tags:
+      - Pricing
+      summary: Evaluate delivery eligibility and price
+      description: Delivery Order validates country eligibility before calling this API. Apply pricing
+        tariffs and weight, urban-area and same-day rules. A valid but unsupported delivery returns a
+        typed rejected result, not an HTTP error.
+      parameters:
+      - name: X-Correlation-ID
+        in: header
+        required: false
+        description: Optional caller correlation identifier; generate one when absent.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PricingEvaluationRequest'
+            example:
+              requestId: 7cb82db3-fe9a-49e1-a0f9-fdeae2455869
+              originPostalCode: 1012AB
+              destinationPostalCode: 5611EM
+              weightInGrams: 2750
+              deliveryType: NEXT_DAY
+      responses:
+        '200':
+          description: Eligible quote or rejected evaluation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingEvaluationResponse'
+              examples:
+                eligible:
+                  value:
+                    requestId: 7cb82db3-fe9a-49e1-a0f9-fdeae2455869
+                    eligible: true
+                    price:
+                      amount: 8.95
+                      currency: EUR
+                    priceComponents:
+                    - type: BASE_PRICE
+                      amount: 6.95
+                    - type: WEIGHT_SURCHARGE
+                      amount: 1
+                    - type: URBAN_AREA_SURCHARGE
+                      amount: 1
+                    evaluatedAt: '2026-11-25T08:29:59Z'
+                rejected:
+                  value:
+                    requestId: 7cb82db3-fe9a-49e1-a0f9-fdeae2455869
+                    eligible: false
+                    rejectionCode: WEIGHT_LIMIT_EXCEEDED
+                    message: Parcel exceeds the supported weight.
+                    evaluatedAt: '2026-11-25T08:29:59Z'
+        '400':
+          description: Invalid evaluation request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Invalid evaluation request
+                status: 400
+                code: VALIDATION_FAILED
+        '500':
+          description: Internal error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Internal error
+                status: 500
+                code: INTERNAL_ERROR
+components:
+  schemas:
+    PricingEvaluationRequest:
+      type: object
+      required:
+      - requestId
+      - originPostalCode
+      - destinationPostalCode
+      - weightInGrams
+      - deliveryType
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        originPostalCode:
+          type: string
+          pattern: ^[1-9][0-9]{3} ?[A-Za-z]{2}$
+          description: Four digits followed by two letters, with optional single space; normalize to uppercase
+            without space.
+          example: 1012 AB
+        destinationPostalCode:
+          type: string
+          pattern: ^[1-9][0-9]{3} ?[A-Za-z]{2}$
+          description: Four digits followed by two letters, with optional single space; normalize to uppercase
+            without space.
+          example: 1012 AB
+        weightInGrams:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Positive grams; above 20000 is a business rejection, not malformed input.
+        deliveryType:
+          $ref: '#/components/schemas/DeliveryType'
+    DeliveryType:
+      type: string
+      enum:
+      - STANDARD
+      - NEXT_DAY
+      - SAME_DAY
+    Money:
+      type: object
+      required:
+      - amount
+      - currency
+      properties:
+        amount:
+          type: number
+          minimum: 0
+          multipleOf: 0.01
+          description: Decimal monetary value; use Java BigDecimal, not floating point.
+          example: 8.95
+        currency:
+          type: string
+          enum:
+          - EUR
+    PriceComponent:
+      type: object
+      required:
+      - type
+      - amount
+      properties:
+        type:
+          type: string
+          enum:
+          - BASE_PRICE
+          - WEIGHT_SURCHARGE
+          - URBAN_AREA_SURCHARGE
+        amount:
+          type: number
+          minimum: 0
+          multipleOf: 0.01
+          description: Decimal monetary value; use Java BigDecimal, not floating point.
+          example: 8.95
+    PricingEvaluationResponse:
+      oneOf:
+      - $ref: '#/components/schemas/EligibleEvaluation'
+      - $ref: '#/components/schemas/RejectedEvaluation'
+    EligibleEvaluation:
+      type: object
+      required:
+      - requestId
+      - eligible
+      - price
+      - priceComponents
+      - evaluatedAt
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        eligible:
+          type: boolean
+          enum:
+          - true
+        price:
+          $ref: '#/components/schemas/Money'
+        priceComponents:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/PriceComponent'
+        evaluatedAt:
+          type: string
+          format: date-time
+      additionalProperties: false
+    RejectedEvaluation:
+      type: object
+      required:
+      - requestId
+      - eligible
+      - rejectionCode
+      - message
+      - evaluatedAt
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        eligible:
+          type: boolean
+          enum:
+          - false
+        rejectionCode:
+          type: string
+          enum:
+          - WEIGHT_LIMIT_EXCEEDED
+          - SAME_DAY_NOT_SUPPORTED
+        message:
+          type: string
+        evaluatedAt:
+          type: string
+          format: date-time
+      additionalProperties: false
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          example: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          type: string
+          example: VALIDATION_FAILED
+        correlationId:
+          type: string
+        violations:
+          type: array
+          items:
+            type: object
+            required:
+            - field
+            - message
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+      description: RFC 9457-compatible problem. Do not include raw input, personal data, stack traces,
+        or internal hostnames.
