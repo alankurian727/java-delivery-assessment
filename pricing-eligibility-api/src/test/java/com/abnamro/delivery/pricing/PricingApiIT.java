@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -152,6 +154,19 @@ class PricingApiIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(json(response).get("violations").get(0).get("field").asText()).isEqualTo("X-Correlation-ID");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"order 123", " "})
+    void rejectsCorrelationIdsWithInvalidCharactersOrBlankValues(String correlationId) throws Exception {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Correlation-ID", correlationId);
+
+        ResponseEntity<String> response = post(request("1012AB", "5611EM", 2750, "NEXT_DAY"), headers);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(json(response).get("violations").get(0).get("field").asText()).isEqualTo("X-Correlation-ID");
+        assertThat(response.getHeaders().getFirst("X-Correlation-ID")).isNotEqualTo(correlationId).isNotBlank();
     }
 
     @Test

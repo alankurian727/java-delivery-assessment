@@ -16,6 +16,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * Takes the caller's X-Correlation-ID, or generates one, puts it in the logging context for the
  * whole request and returns it in the response header.
+ *
+ * <p>The accepted format matches the contract (1-128 printable ASCII characters without spaces), so a
+ * value that passes API validation is always kept. An invalid value is never logged: the request gets a
+ * generated ID and is rejected with 400 by the contract's header validation.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
