@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -16,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 
 /** Starts the application on a random port and calls the API over real HTTP with the real tariff. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ExtendWith(OutputCaptureExtension.class)
 class PricingApiIT {
 
     private static final String URL = "/api/v1/pricing/evaluations";
@@ -68,7 +72,7 @@ class PricingApiIT {
     }
 
     @Test
-    void returnsProblemDetailsForInvalidInputWithoutEchoingIt() throws Exception {
+    void returnsProblemDetailsForInvalidInputWithoutEchoingIt(CapturedOutput output) throws Exception {
         ResponseEntity<String> response = post(request("ABCDEF", "5611EM", 0, "NEXT_DAY"), new HttpHeaders());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -79,6 +83,8 @@ class PricingApiIT {
         assertThat(body.get("violations")).extracting(violation -> violation.get("field").asText())
                 .containsExactlyInAnyOrder("originPostalCode", "weightInGrams");
         assertThat(response.getBody()).doesNotContain("ABCDEF");
+        assertThat(output).contains("event=pricing.request_invalid reason=validation_failed fields=[originPostalCode, weightInGrams]");
+        assertThat(output.getOut()).doesNotContain("ABCDEF");
     }
 
     @Test

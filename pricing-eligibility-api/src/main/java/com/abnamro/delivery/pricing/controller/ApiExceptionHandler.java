@@ -5,6 +5,7 @@ import com.abnamro.delivery.pricing.api.model.ProblemViolationsInner;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.abnamro.delivery.pricing.configuration.CorrelationIdFilter;
@@ -42,7 +43,7 @@ public class ApiExceptionHandler {
     ResponseEntity<Problem> handleInvalidBody(MethodArgumentNotValidException ex) {
         Problem problem = validationProblem();
         ex.getBindingResult().getFieldErrors().forEach(error -> problem.addViolationsItem(toViolation(error)));
-        return respond(problem);
+        return respond(logInvalidRequest(problem, "validation_failed"));
     }
 
     /**
@@ -54,7 +55,7 @@ public class ApiExceptionHandler {
         Problem problem = validationProblem();
         ex.getConstraintViolations().forEach(violation -> problem.addViolationsItem(
                 new ProblemViolationsInner(headerOrParameterName(lastNodeName(violation)), violation.getMessage())));
-        return respond(problem);
+        return respond(logInvalidRequest(problem, "validation_failed"));
     }
 
     /** Malformed JSON, wrong JSON types, or an unknown deliveryType value. */
@@ -62,7 +63,7 @@ public class ApiExceptionHandler {
     ResponseEntity<Problem> handleUnreadableBody(HttpMessageNotReadableException ex) {
         Problem problem = validationProblem();
         problem.setDetail("The request body is not valid JSON for this operation.");
-        return respond(problem);
+        return respond(logInvalidRequest(problem, "unreadable_body"));
     }
 
     /** Values that pass the schema but are rejected by the domain. */
@@ -70,7 +71,7 @@ public class ApiExceptionHandler {
     ResponseEntity<Problem> handleInvalidValue(IllegalArgumentException ex) {
         Problem problem = validationProblem();
         problem.setDetail(ex.getMessage());
-        return respond(problem);
+        return respond(logInvalidRequest(problem, "invalid_value"));
     }
 
     /** Wrong method, content type, Accept header or path: keep Spring's status instead of returning 500. */
@@ -98,6 +99,16 @@ public class ApiExceptionHandler {
     private static Problem problem(HttpStatus status, String title, String code) {
         Problem problem = new Problem("about:blank", title, status.value(), code);
         problem.setCorrelationId(MDC.get(CorrelationIdFilter.MDC_KEY));
+        return problem;
+    }
+
+    /**
+     * Pricing's only client validates requests first, so a 400 here usually means a client bug or
+     * contract drift. Logs the field names only, never the rejected values.
+     */
+    private static Problem logInvalidRequest(Problem problem, String reason) {
+        List<String> fields = problem.getViolations().stream().map(ProblemViolationsInner::getField).sorted().toList();
+        log.warn("event=pricing.request_invalid reason={} fields={}", reason, fields);
         return problem;
     }
 
