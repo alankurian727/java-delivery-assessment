@@ -9,7 +9,7 @@ public record PostalCode(String value) {
 
     public PostalCode {
         if (value == null || !FORMAT.matcher(value).matches()) {
-            throw new DomainValidationException("Invalid Dutch postal code");
+            throw new InvalidPostalCodeException();
         }
     }
 

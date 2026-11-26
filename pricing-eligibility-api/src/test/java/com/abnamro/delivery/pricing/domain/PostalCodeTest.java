@@ -20,7 +20,7 @@ class PostalCodeTest {
     @ValueSource(strings = {"0123AB", "123AB", "12345A", "1012A", "1012ABC", "ABCDEF", ""})
     void rejectsInvalidPostalCodesWithoutEchoingThem(String raw) {
         assertThatThrownBy(() -> PostalCode.of(raw))
-                .isInstanceOf(DomainValidationException.class)
+                .isInstanceOf(InvalidPostalCodeException.class)
                 .hasMessage("Invalid Dutch postal code");
     }
 

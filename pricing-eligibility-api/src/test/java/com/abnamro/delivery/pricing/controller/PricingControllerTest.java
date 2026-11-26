@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.abnamro.delivery.pricing.domain.DomainValidationException;
+import com.abnamro.delivery.pricing.domain.InvalidPostalCodeException;
 import com.abnamro.delivery.pricing.service.PricingEvaluationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,15 +53,14 @@ class PricingControllerTest {
     }
 
     @Test
-    void returnsBadRequestForValuesRejectedByTheDomainWithoutTheExceptionMessage() throws Exception {
+    void returnsBadRequestForAnInvalidPostalCode() throws Exception {
         when(pricingEvaluationService.evaluate(any()))
-                .thenThrow(new DomainValidationException("Invalid Dutch postal code"));
+                .thenThrow(new InvalidPostalCodeException());
 
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(VALID_REQUEST))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.detail").value("A request value is not valid."))
-                .andExpect(content().string(not(containsString("Invalid Dutch postal code"))));
+                .andExpect(jsonPath("$.detail").value("A postal code is not a valid Dutch postal code."));
     }
 
     @Test

@@ -9,7 +9,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.abnamro.delivery.pricing.configuration.CorrelationIdFilter;
-import com.abnamro.delivery.pricing.domain.DomainValidationException;
+import com.abnamro.delivery.pricing.domain.InvalidPostalCodeException;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -67,14 +67,14 @@ public class ApiExceptionHandler {
     }
 
     /**
-     * Client input that passed the contract but is rejected by the domain. The exception message is not
-     * returned; other exceptions, including IllegalArgumentException, are internal errors (500).
+     * A postal code the domain rejects. The contract's pattern normally rejects these first; this keeps a
+     * 400 if the two ever differ. Other exceptions, including IllegalArgumentException, are internal errors (500).
      */
-    @ExceptionHandler(DomainValidationException.class)
-    ResponseEntity<Problem> handleInvalidValue(DomainValidationException ex) {
+    @ExceptionHandler(InvalidPostalCodeException.class)
+    ResponseEntity<Problem> handleInvalidValue(InvalidPostalCodeException ex) {
         Problem problem = validationProblem();
-        problem.setDetail("A request value is not valid.");
-        return respond(logInvalidRequest(problem, "invalid_value"));
+        problem.setDetail("A postal code is not a valid Dutch postal code.");
+        return respond(logInvalidRequest(problem, "invalid_postal_code"));
     }
 
     /**
