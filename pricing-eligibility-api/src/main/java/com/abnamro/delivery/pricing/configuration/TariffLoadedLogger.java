@@ -20,12 +20,14 @@ public class TariffLoadedLogger {
 
     @EventListener(ApplicationReadyEvent.class)
     public void logTariff() {
-        log.info("event=pricing.tariff_loaded basePrices={} maxWeightInGrams={} weightBands={} urbanArea={}-{} urbanSurcharge={}",
-                tariff.basePrices(),
-                tariff.maxWeightInGrams(),
-                tariff.weightBands().stream().map(band -> band.upToGrams() + "g:" + band.surcharge()).toList(),
-                tariff.urbanArea().from(),
-                tariff.urbanArea().to(),
-                tariff.urbanArea().surcharge());
+        log.atInfo().setMessage("Tariff loaded")
+                .addKeyValue("event", "pricing.tariff_loaded")
+                .addKeyValue("basePrices", tariff.basePrices())
+                .addKeyValue("maxWeightInGrams", tariff.maxWeightInGrams())
+                .addKeyValue("weightBands", tariff.weightBands().stream()
+                        .map(band -> band.upToGrams() + "g:" + band.surcharge()).toList())
+                .addKeyValue("urbanArea", tariff.urbanArea().from() + "-" + tariff.urbanArea().to())
+                .addKeyValue("urbanSurcharge", tariff.urbanArea().surcharge())
+                .log();
     }
 }

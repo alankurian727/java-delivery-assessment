@@ -1,5 +1,10 @@
-# Shared development environment: detailed application logs.
+# Shared development environment.
 logging:
+  structured:
+    format:
+      # JSON log lines (Elastic Common Schema): timestamp, level, service.name, correlationId (from the MDC)
+      # and every addKeyValue field (event, pricingRequestId, outcome, ...) are separately searchable.
+      console: ecs
   level:
-    root: INFO
+    # Rule-by-rule DEBUG lines help when checking prices in a shared environment.
     com.abnamro.delivery: DEBUG

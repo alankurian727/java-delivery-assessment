@@ -85,7 +85,7 @@ class PricingApiIT {
         assertThat(body.get("violations")).extracting(violation -> violation.get("field").asText())
                 .containsExactlyInAnyOrder("originPostalCode", "weightInGrams");
         assertThat(response.getBody()).doesNotContain("ABCDEF");
-        assertThat(output).contains("event=pricing.request_invalid reason=validation_failed fields=[originPostalCode, weightInGrams]");
+        assertThat(output).contains("event=\"pricing.request_invalid\" reason=\"validation_failed\" fields=\"[originPostalCode, weightInGrams]\"");
         assertThat(output.getOut()).doesNotContain("ABCDEF");
     }
 

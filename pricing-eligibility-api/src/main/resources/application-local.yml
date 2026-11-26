@@ -1,5 +1,9 @@
-# Developer machine: detailed application logs.
+# Developer machine (default profile).
 logging:
+  pattern:
+    # Readable text instead of JSON. %X{correlationId} prints the request's correlation ID and %kvp prints the
+    # structured fields added with addKeyValue (event, pricingRequestId, outcome, ...) after the message.
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [%15.15t] [%X{correlationId:-}] %-40.40logger{39} : %m %kvp%n%wEx"
   level:
-    root: INFO
+    # Rule-by-rule DEBUG lines for each evaluation.
     com.abnamro.delivery: DEBUG

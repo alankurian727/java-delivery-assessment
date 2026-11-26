@@ -33,8 +33,13 @@ public class BasePriceRule implements PriceComponentRule {
             throw new IllegalStateException("No base price configured for " + shipment.deliveryType());
         }
         Money amount = new Money(basePrice);
-        log.debug("event=pricing.rule rule=BasePriceRule result=applied deliveryType={} amount={}",
-                shipment.deliveryType(), amount.amount());
+        log.atDebug().setMessage("Pricing rule evaluated")
+                .addKeyValue("event", "pricing.rule")
+                .addKeyValue("rule", "BasePriceRule")
+                .addKeyValue("result", "applied")
+                .addKeyValue("deliveryType", shipment.deliveryType())
+                .addKeyValue("amount", amount.amount())
+                .log();
         return Optional.of(new PriceComponent(PriceComponentType.BASE_PRICE, amount));
     }
 }

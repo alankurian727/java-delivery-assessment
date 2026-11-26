@@ -33,8 +33,13 @@ public class WeightSurchargeRule implements PriceComponentRule {
                 .findFirst()
                 .map(band -> new Money(band.surcharge()))
                 .orElseThrow(() -> new IllegalStateException("No weight band covers " + shipment.weightInGrams() + " grams"));
-        log.debug("event=pricing.rule rule=WeightSurchargeRule result={} weightInGrams={} amount={}",
-                surcharge.isZero() ? "skipped" : "applied", shipment.weightInGrams(), surcharge.amount());
+        log.atDebug().setMessage("Pricing rule evaluated")
+                .addKeyValue("event", "pricing.rule")
+                .addKeyValue("rule", "WeightSurchargeRule")
+                .addKeyValue("result", surcharge.isZero() ? "skipped" : "applied")
+                .addKeyValue("weightInGrams", shipment.weightInGrams())
+                .addKeyValue("amount", surcharge.amount())
+                .log();
         if (surcharge.isZero()) {
             return Optional.empty();
         }

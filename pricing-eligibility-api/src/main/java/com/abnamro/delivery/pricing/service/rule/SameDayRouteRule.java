@@ -20,13 +20,21 @@ public class SameDayRouteRule implements EligibilityRule {
     @Override
     public Optional<Rejection> check(Shipment shipment) {
         if (shipment.deliveryType() != DeliveryType.SAME_DAY) {
-            log.debug("event=pricing.rule rule=SameDayRouteRule result=not_applicable deliveryType={}",
-                    shipment.deliveryType());
+            log.atDebug().setMessage("Pricing rule evaluated")
+                .addKeyValue("event", "pricing.rule")
+                .addKeyValue("rule", "SameDayRouteRule")
+                .addKeyValue("result", "not_applicable")
+                .addKeyValue("deliveryType", shipment.deliveryType())
+                .log();
             return Optional.empty();
         }
         boolean sameArea = shipment.origin().digits().equals(shipment.destination().digits());
-        log.debug("event=pricing.rule rule=SameDayRouteRule result={} sameArea={}",
-                sameArea ? "passed" : "rejected", sameArea);
+        log.atDebug().setMessage("Pricing rule evaluated")
+                .addKeyValue("event", "pricing.rule")
+                .addKeyValue("rule", "SameDayRouteRule")
+                .addKeyValue("result", sameArea ? "passed" : "rejected")
+                .addKeyValue("sameArea", sameArea)
+                .log();
         if (sameArea) {
             return Optional.empty();
         }

@@ -34,8 +34,13 @@ public class UrbanAreaSurchargeRule implements PriceComponentRule {
         boolean originUrban = shipment.origin().isWithin(from, to);
         boolean destinationUrban = shipment.destination().isWithin(from, to);
         boolean applies = originUrban || destinationUrban;
-        log.debug("event=pricing.rule rule=UrbanAreaSurchargeRule result={} originUrban={} destinationUrban={}",
-                applies ? "applied" : "skipped", originUrban, destinationUrban);
+        log.atDebug().setMessage("Pricing rule evaluated")
+                .addKeyValue("event", "pricing.rule")
+                .addKeyValue("rule", "UrbanAreaSurchargeRule")
+                .addKeyValue("result", applies ? "applied" : "skipped")
+                .addKeyValue("originUrban", originUrban)
+                .addKeyValue("destinationUrban", destinationUrban)
+                .log();
         if (applies) {
             return Optional.of(new PriceComponent(PriceComponentType.URBAN_AREA_SURCHARGE, surcharge));
         }

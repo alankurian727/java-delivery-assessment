@@ -98,7 +98,10 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<Problem> handleUnexpected(Exception ex) {
-        log.error("event=pricing.failed message=\"Unexpected error while evaluating pricing\"", ex);
+        log.atError().setMessage("Unexpected error while evaluating pricing")
+                .addKeyValue("event", "pricing.failed")
+                .setCause(ex)
+                .log();
         return respond(problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", INTERNAL_ERROR));
     }
 
@@ -118,7 +121,11 @@ public class ApiExceptionHandler {
      */
     private static Problem logInvalidRequest(Problem problem, String reason) {
         List<String> fields = problem.getViolations().stream().map(ProblemViolationsInner::getField).sorted().toList();
-        log.warn("event=pricing.request_invalid reason={} fields={}", reason, fields);
+        log.atWarn().setMessage("Invalid pricing request")
+                .addKeyValue("event", "pricing.request_invalid")
+                .addKeyValue("reason", reason)
+                .addKeyValue("fields", fields)
+                .log();
         return problem;
     }
 

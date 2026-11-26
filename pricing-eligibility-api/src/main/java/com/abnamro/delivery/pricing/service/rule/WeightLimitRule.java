@@ -25,8 +25,13 @@ public class WeightLimitRule implements EligibilityRule {
     @Override
     public Optional<Rejection> check(Shipment shipment) {
         boolean withinLimit = shipment.weightInGrams() <= maxWeightInGrams;
-        log.debug("event=pricing.rule rule=WeightLimitRule result={} weightInGrams={} maxWeightInGrams={}",
-                withinLimit ? "passed" : "rejected", shipment.weightInGrams(), maxWeightInGrams);
+        log.atDebug().setMessage("Pricing rule evaluated")
+                .addKeyValue("event", "pricing.rule")
+                .addKeyValue("rule", "WeightLimitRule")
+                .addKeyValue("result", withinLimit ? "passed" : "rejected")
+                .addKeyValue("weightInGrams", shipment.weightInGrams())
+                .addKeyValue("maxWeightInGrams", maxWeightInGrams)
+                .log();
         if (withinLimit) {
             return Optional.empty();
         }
