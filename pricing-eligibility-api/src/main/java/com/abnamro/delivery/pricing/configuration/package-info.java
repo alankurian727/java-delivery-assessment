@@ -1,4 +1,4 @@
 /**
  * Spring configuration for the pricing service.
  */
-package com.alankurian.delivery.pricing.configuration;
+package com.abnamro.delivery.pricing.configuration;

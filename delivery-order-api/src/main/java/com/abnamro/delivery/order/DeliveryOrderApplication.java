@@ -1,12 +1,12 @@
-package com.alankurian.delivery.pricing;
+package com.abnamro.delivery.order;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class PricingEligibilityApplication {
+public class DeliveryOrderApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(PricingEligibilityApplication.class, args);
+        SpringApplication.run(DeliveryOrderApplication.class, args);
     }
 }
