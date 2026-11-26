@@ -1,0 +1,7 @@
+# Developer machine: readable console logs with the correlation ID, detailed application logs.
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "
+  level:
+    root: INFO
+    com.abnamro.delivery: DEBUG

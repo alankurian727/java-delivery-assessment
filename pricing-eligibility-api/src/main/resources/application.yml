@@ -1,6 +1,9 @@
 spring:
   application:
     name: pricing-eligibility-api
+  profiles:
+    # Profiles: local (developer machine), dev (shared development), prod. Set SPRING_PROFILES_ACTIVE to choose.
+    default: local
   jackson:
     default-property-inclusion: non_null
     deserialization:
@@ -35,11 +38,6 @@ springdoc:
 
 server:
   port: 8081
-
-logging:
-  structured:
-    format:
-      console: ecs
 
 management:
   endpoints:

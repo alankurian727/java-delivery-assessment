@@ -1,0 +1,8 @@
+# Production: JSON logs; application events at INFO, frameworks only at WARN and above.
+logging:
+  structured:
+    format:
+      console: ecs
+  level:
+    root: WARN
+    com.abnamro.delivery: INFO
