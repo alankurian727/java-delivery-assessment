@@ -146,16 +146,17 @@ components:
       properties:
         type:
           type: string
-          enum:
-          - BASE_PRICE
-          - WEIGHT_SURCHARGE
-          - URBAN_AREA_SURCHARGE
+          description: 'Price component type. Known values: BASE_PRICE, WEIGHT_SURCHARGE, URBAN_AREA_SURCHARGE.
+            New pricing strategies may add values; clients must tolerate unknown types.'
+          example: BASE_PRICE
         amount:
           type: number
           minimum: 0
           description: Amount in euros with at most two decimal places.
           example: 8.95
     PricingEvaluationResponse:
+      description: Eligible or rejected result, distinguished by the eligible flag. Additional properties may
+        be added; clients must ignore unknown properties.
       oneOf:
       - $ref: '#/components/schemas/EligibleEvaluation'
       - $ref: '#/components/schemas/RejectedEvaluation'
@@ -185,7 +186,6 @@ components:
         evaluatedAt:
           type: string
           format: date-time
-      additionalProperties: false
     RejectedEvaluation:
       type: object
       required:
@@ -204,15 +204,14 @@ components:
           - false
         rejectionCode:
           type: string
-          enum:
-          - WEIGHT_LIMIT_EXCEEDED
-          - SAME_DAY_NOT_SUPPORTED
+          description: 'Reason the delivery is not eligible. Known values: WEIGHT_LIMIT_EXCEEDED, SAME_DAY_NOT_SUPPORTED.
+            New rules may add values; clients must tolerate unknown codes.'
+          example: WEIGHT_LIMIT_EXCEEDED
         message:
           type: string
         evaluatedAt:
           type: string
           format: date-time
-      additionalProperties: false
     Problem:
       type: object
       required:
