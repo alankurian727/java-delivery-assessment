@@ -41,8 +41,7 @@ server:
 
 logging:
   pattern:
-    # Adds the request's correlation ID to every text log line, for example [demo-1].
-    # Applies to text logs (local profile); JSON logs (dev, prod) include correlationId as a field automatically.
+    # Adds the request's correlation ID to every log line, for example [demo-1].
     correlation: "[%X{correlationId:-}] "
 
 management:

@@ -1,12 +1,5 @@
-# Shared development environment.
+# Shared development environment: detailed application logs.
 logging:
-  structured:
-    format:
-      # JSON log lines (Elastic Common Schema) so the log platform gets timestamp, level, service and
-      # correlationId as named fields without parsing rules. Event details stay key=value in "message".
-      # The local profile keeps readable text logs instead.
-      console: ecs
   level:
     root: INFO
-    # Rule-level DEBUG lines help when checking prices in a shared environment.
     com.abnamro.delivery: DEBUG

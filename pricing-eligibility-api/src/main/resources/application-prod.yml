@@ -1,12 +1,5 @@
-# Production.
+# Production: application events at INFO, frameworks only at WARN and above.
 logging:
-  structured:
-    format:
-      # JSON log lines (Elastic Common Schema) so the log platform gets timestamp, level, service and
-      # correlationId as named fields without parsing rules. Event details stay key=value in "message".
-      console: ecs
   level:
-    # Frameworks only report problems; their INFO start-up and housekeeping lines are noise in production.
     root: WARN
-    # Application events (pricing.evaluated, pricing.tariff_loaded, request_invalid) stay visible; rule-level DEBUG lines do not.
     com.abnamro.delivery: INFO
