@@ -9,6 +9,22 @@ permissions:
   contents: read
 
 jobs:
+  pricing-contract-copy:
+    name: Pricing contract copy matches
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Compare Delivery Order's copy with the Pricing contract
+        run: >-
+          diff -u
+          pricing-eligibility-api/src/main/resources/static/openapi/pricing-eligibility.yaml
+          delivery-order-api/src/main/resources/openapi-client/pricing-eligibility.yaml
+
   verify:
     name: Verify ${{ matrix.service }}
     runs-on: ubuntu-latest
