@@ -15,7 +15,7 @@ Both standalone contracts use OpenAPI 3.0.3.
 - Equivalent completed submissions replay their original terminal status/body (201 and Location for success, 422 for rejection). Different content for the same key returns 409; concurrent matching requests still processing may receive 409 with code IDEMPOTENCY_IN_PROGRESS. A 503 permits reevaluation with the same key and input. Compare normalized requests, not raw JSON bytes.
 - Pricing timeout, upstream server error, and invalid upstream response map to 503 without confirmation. GET uses the persisted historical price and does not call Pricing.
 - Idempotency keys are opaque, case-sensitive, 1–128 printable non-space ASCII characters. UUID order/request IDs and UTC timestamps are used. Examples contain fictional labels, not real customer data.
-- Money is represented as a JSON number with cent precision, mapped to BigDecimal in Java. No float/double calculations.
+- Money is represented as a JSON number, mapped to BigDecimal in Java. Enforce at most two decimal places in application validation and monetary calculations. The schemas deliberately omit fractional multipleOf to avoid floating-point validator inconsistencies. No float/double calculations.
 
 ## Pricing assumption to confirm
 
