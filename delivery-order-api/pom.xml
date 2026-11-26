@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.alankurian.delivery</groupId>
+    <groupId>com.abnamro.delivery</groupId>
     <artifactId>delivery-order-api</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>delivery-order-api</name>
