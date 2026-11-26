@@ -9,6 +9,12 @@ flowchart LR
     Order -->|JDBC :5432| DB[(PostgreSQL)]
 ```
 
+## Package structure
+
+Delivery Order uses `controller` for HTTP, `service` for order coordination, and `repository` for PostgreSQL access. Its `pricing` package holds the HTTP client for Pricing & Eligibility.
+
+Pricing & Eligibility uses `controller` for HTTP and `service` for eligibility and price calculation. The service is stateless.
+
 ## Planned request flow
 
 Delivery Order validates the request and binds its idempotency key. It calls Pricing over HTTP outside a database transaction. Pricing evaluates eligibility and calculates a quote. Delivery Order stores the confirmed price and currency with the order. Later reads return that stored snapshot, including when Pricing is unavailable.
