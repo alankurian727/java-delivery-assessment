@@ -1,5 +1,6 @@
 package com.abnamro.delivery.pricing.domain;
 
+import com.abnamro.delivery.pricing.exception.InvalidPostalCodeException;
 import java.util.Locale;
 import java.util.regex.Pattern;
 

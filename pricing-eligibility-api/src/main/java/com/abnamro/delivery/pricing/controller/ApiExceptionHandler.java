@@ -9,7 +9,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.abnamro.delivery.pricing.configuration.CorrelationIdFilter;
-import com.abnamro.delivery.pricing.domain.InvalidPostalCodeException;
+import com.abnamro.delivery.pricing.exception.InvalidPostalCodeException;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;

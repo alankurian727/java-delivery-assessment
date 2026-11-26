@@ -1,4 +1,4 @@
-package com.abnamro.delivery.pricing.domain;
+package com.abnamro.delivery.pricing.exception;
 
 /**
  * A postal code that is not a valid Dutch postal code. Returned to the client as HTTP 400 without this

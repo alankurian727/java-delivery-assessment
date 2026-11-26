@@ -1,5 +1,6 @@
 package com.abnamro.delivery.pricing.domain;
 
+import com.abnamro.delivery.pricing.exception.InvalidPostalCodeException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
