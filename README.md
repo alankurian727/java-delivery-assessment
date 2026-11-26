@@ -9,14 +9,7 @@ Two independently buildable Java 21 and Spring Boot services.
 
 ## Run with Docker Compose
 
-With Docker running, set a local PostgreSQL password in the repository root's
-`.env` file. Git ignores this file.
-
-```dotenv
-DELIVERY_DB_PASSWORD=replace-with-a-local-password
-```
-
-From the repository root, start the stack and check both APIs:
+With Docker running, start the stack from the repository root and check both APIs. Compose uses `delivery-dev` as the local PostgreSQL password.
 
 ```sh
 docker compose up --build --wait
@@ -29,6 +22,8 @@ services with their Maven wrappers and starts PostgreSQL on the Compose network.
 
 Use `docker compose logs -f` to view logs and `docker compose down` to stop the
 stack. PostgreSQL data persists in the named volume.
+
+For an optional local override, set `DELIVERY_DB_PASSWORD` in the shell or in a root `.env` file before the first startup. An existing database keeps its current password. See [deployment improvements](docs/improvements/) for production configuration.
 
 ## Build and run with Maven
 
