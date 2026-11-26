@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.abnamro.delivery.pricing.domain.DomainValidationException;
 import com.abnamro.delivery.pricing.service.PricingEvaluationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,12 +53,26 @@ class PricingControllerTest {
     }
 
     @Test
-    void returnsBadRequestForValuesRejectedByTheDomain() throws Exception {
-        when(pricingEvaluationService.evaluate(any())).thenThrow(new IllegalArgumentException("Negative amount"));
+    void returnsBadRequestForValuesRejectedByTheDomainWithoutTheExceptionMessage() throws Exception {
+        when(pricingEvaluationService.evaluate(any()))
+                .thenThrow(new DomainValidationException("Invalid Dutch postal code"));
 
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(VALID_REQUEST))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.detail").value("Negative amount"));
+                .andExpect(jsonPath("$.detail").value("A request value is not valid."))
+                .andExpect(content().string(not(containsString("Invalid Dutch postal code"))));
+    }
+
+    @Test
+    void treatsOtherIllegalArgumentsAsInternalErrors() throws Exception {
+        when(pricingEvaluationService.evaluate(any()))
+                .thenThrow(new IllegalArgumentException("Unexpected value 'EXPRESS' in com.example.Internal"));
+
+        mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(VALID_REQUEST))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(content().string(not(containsString("EXPRESS"))))
+                .andExpect(content().string(not(containsString("com.example"))));
     }
 }

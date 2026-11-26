@@ -9,6 +9,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.abnamro.delivery.pricing.configuration.CorrelationIdFilter;
+import com.abnamro.delivery.pricing.domain.DomainValidationException;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -66,11 +67,14 @@ public class ApiExceptionHandler {
         return respond(logInvalidRequest(problem, "unreadable_body"));
     }
 
-    /** Values that pass the schema but are rejected by the domain. */
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<Problem> handleInvalidValue(IllegalArgumentException ex) {
+    /**
+     * Client input that passed the contract but is rejected by the domain. The exception message is not
+     * returned; other exceptions, including IllegalArgumentException, are internal errors (500).
+     */
+    @ExceptionHandler(DomainValidationException.class)
+    ResponseEntity<Problem> handleInvalidValue(DomainValidationException ex) {
         Problem problem = validationProblem();
-        problem.setDetail(ex.getMessage());
+        problem.setDetail("A request value is not valid.");
         return respond(logInvalidRequest(problem, "invalid_value"));
     }
 
