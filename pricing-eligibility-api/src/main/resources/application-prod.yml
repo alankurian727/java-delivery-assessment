@@ -1,0 +1,9 @@
+# Production.
+logging:
+  structured:
+    format:
+      # JSON log lines (Elastic Common Schema): timestamp, level, service.name, correlationId (from the MDC)
+      # and every addKeyValue field (event, pricingRequestId, outcome, ...) are separately searchable.
+      console: ecs
+  level:
+    root: INFO
