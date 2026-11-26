@@ -1,0 +1,366 @@
+openapi: 3.0.3
+info:
+  title: Delivery Order API
+  version: 1.0.0
+  description: Create and retrieve parcel delivery orders.
+paths:
+  /api/v1/delivery-orders:
+    post:
+      operationId: createDeliveryOrder
+      tags:
+      - Delivery orders
+      summary: Create a delivery order
+      description: Creates an order if the delivery is eligible. Use the same idempotency key to retry a request safely.
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[!-~]+$
+          example: 8fc11c85-630d-4044-a620-cc862b8e19d5
+        description: Unique, case-sensitive key for a logical order request. Reuse only for equivalent input.
+      - name: X-Correlation-ID
+        in: header
+        required: false
+        description: Optional identifier for tracing a request across services.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeliveryOrderRequest'
+            example:
+              customerReference: DEMO-001
+              sender:
+                name: Test Sender
+                postalCode: 1012 AB
+                countryCode: NL
+              recipient:
+                name: Test Recipient
+                postalCode: 5611EM
+                countryCode: NL
+              parcel:
+                weightInGrams: 2750
+              deliveryType: NEXT_DAY
+      responses:
+        '201':
+          description: Order confirmed or previously confirmed order returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmedOrder'
+              example:
+                orderId: 63828489-bf90-40bb-b5c1-cb2171397338
+                customerReference: DEMO-001
+                status: CONFIRMED
+                price:
+                  amount: 8.95
+                  currency: EUR
+                createdAt: '2026-11-25T08:30:00Z'
+          headers:
+            Location:
+              description: Relative URI of the confirmed order.
+              schema:
+                type: string
+                example: /api/v1/delivery-orders/63828489-bf90-40bb-b5c1-cb2171397338
+        '400':
+          description: Invalid request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Invalid request
+                status: 400
+                code: VALIDATION_FAILED
+        '409':
+          description: Key already used for different input or matching request still in progress.
+          headers:
+            Retry-After:
+              description: Present only for IDEMPOTENCY_IN_PROGRESS. Suggested number of seconds to wait before retrying with the same idempotency key.
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Idempotency conflict or matching request in progress
+                status: 409
+                code: IDEMPOTENCY_CONFLICT
+        '422':
+          description: Delivery is not eligible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Delivery is not eligible
+                status: 422
+                code: WEIGHT_LIMIT_EXCEEDED
+                orderStatus: REJECTED
+        '500':
+          description: Internal error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Internal error
+                status: 500
+                code: INTERNAL_ERROR
+        '503':
+          description: Pricing unavailable. Retry with the same idempotency key.
+          headers:
+            Retry-After:
+              description: Suggested number of seconds to wait before retrying with the same idempotency key.
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Pricing temporarily unavailable or invalid upstream response
+                status: 503
+                code: PRICING_UNAVAILABLE
+                orderStatus: PRICING_UNAVAILABLE
+  /api/v1/delivery-orders/{orderId}:
+    get:
+      operationId: getDeliveryOrder
+      tags:
+      - Delivery orders
+      summary: Retrieve a confirmed order
+      description: Returns the confirmed order with its original price.
+      parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Correlation-ID
+        in: header
+        required: false
+        description: Optional identifier for tracing a request across services.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      responses:
+        '200':
+          description: Confirmed order details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmedOrder'
+              example:
+                orderId: 63828489-bf90-40bb-b5c1-cb2171397338
+                customerReference: DEMO-001
+                status: CONFIRMED
+                price:
+                  amount: 8.95
+                  currency: EUR
+                createdAt: '2026-11-25T08:30:00Z'
+        '400':
+          description: Invalid order identifier
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Invalid order identifier
+                status: 400
+                code: VALIDATION_FAILED
+        '404':
+          description: Order not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Order not found
+                status: 404
+                code: ORDER_NOT_FOUND
+        '500':
+          description: Internal error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Internal error
+                status: 500
+                code: INTERNAL_ERROR
+components:
+  schemas:
+    CreateDeliveryOrderRequest:
+      type: object
+      required:
+      - customerReference
+      - sender
+      - recipient
+      - parcel
+      - deliveryType
+      properties:
+        customerReference:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: \S
+        sender:
+          $ref: '#/components/schemas/Party'
+        recipient:
+          $ref: '#/components/schemas/Party'
+        parcel:
+          $ref: '#/components/schemas/Parcel'
+        deliveryType:
+          $ref: '#/components/schemas/DeliveryType'
+    Party:
+      type: object
+      required:
+      - name
+      - postalCode
+      - countryCode
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: \S
+        postalCode:
+          type: string
+          pattern: ^[1-9][0-9]{3} ?[A-Za-z]{2}$
+          description: Dutch postal code, with or without a space (e.g. 1012AB or 1012 AB). Case-insensitive;
+            normalized to uppercase without a space (1012AB) before pricing and idempotency comparison.
+          example: 1012 AB
+        countryCode:
+          type: string
+          pattern: ^[A-Za-z]{2}$
+          description: Two-letter country code. Only NL is supported.
+          example: NL
+    Parcel:
+      type: object
+      required:
+      - weightInGrams
+      properties:
+        weightInGrams:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Parcel weight in grams. Deliveries above 20,000 grams are not eligible.
+    DeliveryType:
+      type: string
+      enum:
+      - STANDARD
+      - NEXT_DAY
+      - SAME_DAY
+    OrderStatus:
+      type: string
+      enum:
+      - CONFIRMED
+      - REJECTED
+      - PRICING_UNAVAILABLE
+    ConfirmedOrder:
+      type: object
+      required:
+      - orderId
+      - customerReference
+      - status
+      - price
+      - createdAt
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        customerReference:
+          type: string
+        status:
+          type: string
+          enum:
+          - CONFIRMED
+        price:
+          $ref: '#/components/schemas/Money'
+        createdAt:
+          type: string
+          format: date-time
+    Money:
+      type: object
+      required:
+      - amount
+      - currency
+      properties:
+        amount:
+          type: number
+          minimum: 0
+          description: Amount in euros with at most two decimal places.
+          example: 8.95
+        currency:
+          type: string
+          enum:
+          - EUR
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          example: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          type: string
+          description: 'Machine-readable code identifying the error. Known values: VALIDATION_FAILED,
+            IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS, UNSUPPORTED_COUNTRY, WEIGHT_LIMIT_EXCEEDED,
+            SAME_DAY_NOT_SUPPORTED, ORDER_NOT_FOUND, PRICING_UNAVAILABLE, INTERNAL_ERROR. Clients must tolerate
+            new values.'
+          example: VALIDATION_FAILED
+        correlationId:
+          type: string
+        orderStatus:
+          $ref: '#/components/schemas/OrderStatus'
+        violations:
+          type: array
+          items:
+            type: object
+            required:
+            - field
+            - message
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+      description: Error details in RFC 9457 Problem Details format. Never includes raw request input,
+        personal data, stack traces, database details, internal hostnames or Java class names.
