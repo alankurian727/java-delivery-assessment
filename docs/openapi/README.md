@@ -12,7 +12,7 @@ Both standalone contracts use OpenAPI 3.0.3. Each contract lives in the service 
 Each service's `pom.xml` runs `openapi-generator-maven-plugin` during the build. The plugin generates code into `target/generated-sources/openapi`, which is not committed.
 
 - Pricing generates its server interface (`PricingApi`) and models from its own contract.
-- Delivery Order generates its server interface (`DeliveryOrdersApi`) and models from its own contract. A second execution generates Pricing client models from `delivery-order-api/src/main/resources/openapi-client/pricing-eligibility.yaml`. That file is Delivery Order's copy of the Pricing contract, so the services stay release-independent. When the Pricing contract changes, update this copy in the same change and review whether the Delivery Order client needs to change.
+- Delivery Order generates its server interface (`DeliveryOrdersApi`) and models from its own contract. A second execution generates Pricing client models from `delivery-order-api/src/main/openapi/pricing-eligibility.yaml`. That file is Delivery Order's copy of the Pricing contract, so the services stay release-independent. When the Pricing contract changes, update this copy in the same change and review whether the Delivery Order client needs to change.
 - Controllers implement the generated interfaces. The interfaces have no default methods, so every operation must be implemented.
 - Swagger UI (`/swagger-ui/index.html`) shows the static contract served from `/openapi/`, not a spec derived from the code.
 

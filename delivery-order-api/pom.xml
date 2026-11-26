@@ -131,7 +131,7 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
-                            <inputSpec>${project.basedir}/src/main/resources/openapi-client/pricing-eligibility.yaml</inputSpec>
+                            <inputSpec>${project.basedir}/src/main/openapi/pricing-eligibility.yaml</inputSpec>
                             <generatorName>spring</generatorName>
                             <modelPackage>com.abnamro.delivery.order.pricing.model</modelPackage>
                             <generateApis>false</generateApis>
