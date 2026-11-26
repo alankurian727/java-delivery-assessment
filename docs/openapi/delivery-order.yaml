@@ -2,9 +2,7 @@ openapi: 3.0.3
 info:
   title: Delivery Order API
   version: 1.0.0
-  description: Public delivery workflow API. Only confirmed orders are created; rejected and temporarily
-    unavailable outcomes are represented as attempt statuses in problem responses. Production authentication
-    and authorization are outside the assessment contract.
+  description: Create and retrieve parcel delivery orders.
 paths:
   /api/v1/delivery-orders:
     post:
@@ -12,11 +10,7 @@ paths:
       tags:
       - Delivery orders
       summary: Create a delivery order
-      description: Bind the required key to normalized input. Replay the same terminal HTTP status and
-        body for equivalent input; replay the original Location for confirmation. A transient pricing
-        failure preserves the key binding and permits reevaluation with the same input. Concurrent matching
-        requests must not create more than one order; an in-progress request may receive 409 and retry.
-        Country eligibility is evaluated before pricing.
+      description: Creates an order if the delivery is eligible. Use the same idempotency key to retry a request safely.
       parameters:
       - name: Idempotency-Key
         in: header
@@ -27,11 +21,11 @@ paths:
           maxLength: 128
           pattern: ^[!-~]+$
           example: 8fc11c85-630d-4044-a620-cc862b8e19d5
-        description: Opaque case-sensitive key; do not reuse for different normalized input.
+        description: Unique, case-sensitive key for a logical order request. Reuse only for equivalent input.
       - name: X-Correlation-ID
         in: header
         required: false
-        description: Optional caller correlation identifier; generate one when absent.
+        description: Optional identifier for tracing a request across services.
         schema:
           type: string
           minLength: 1
@@ -57,7 +51,7 @@ paths:
               deliveryType: NEXT_DAY
       responses:
         '201':
-          description: Confirmed order, including equivalent successful replay
+          description: Order confirmed or previously confirmed order returned.
           content:
             application/json:
               schema:
@@ -88,7 +82,7 @@ paths:
                 status: 400
                 code: VALIDATION_FAILED
         '409':
-          description: Idempotency conflict or matching request in progress
+          description: Key already used for different input or matching request still in progress.
           content:
             application/problem+json:
               schema:
@@ -122,7 +116,7 @@ paths:
                 status: 500
                 code: INTERNAL_ERROR
         '503':
-          description: Pricing temporarily unavailable or invalid upstream response
+          description: Pricing unavailable. Retry with the same idempotency key.
           content:
             application/problem+json:
               schema:
@@ -139,7 +133,7 @@ paths:
       tags:
       - Delivery orders
       summary: Retrieve a confirmed order
-      description: Returns persisted price and timestamp without invoking Pricing.
+      description: Returns the confirmed order with its original price.
       parameters:
       - name: orderId
         in: path
@@ -150,14 +144,14 @@ paths:
       - name: X-Correlation-ID
         in: header
         required: false
-        description: Optional caller correlation identifier; generate one when absent.
+        description: Optional identifier for tracing a request across services.
         schema:
           type: string
           minLength: 1
           maxLength: 128
       responses:
         '200':
-          description: Stored order
+          description: Confirmed order details.
           content:
             application/json:
               schema:
@@ -242,13 +236,12 @@ components:
         postalCode:
           type: string
           pattern: ^[1-9][0-9]{3} ?[A-Za-z]{2}$
-          description: Four digits followed by two letters, with optional single space; normalize to uppercase
-            without space.
+          description: Dutch postal code, with or without a space (e.g. 1012AB or 1012 AB).
           example: 1012 AB
         countryCode:
           type: string
           pattern: ^[A-Za-z]{2}$
-          description: Two-letter country code; normalize to uppercase. Non-NL is a business rejection.
+          description: Two-letter country code. Only NL is supported.
           example: NL
     Parcel:
       type: object
@@ -259,7 +252,7 @@ components:
           type: integer
           format: int64
           minimum: 1
-          description: Positive grams; above 20000 is a business rejection, not malformed input.
+          description: Parcel weight in grams. Deliveries above 20,000 grams are not eligible.
     DeliveryType:
       type: string
       enum:
@@ -304,7 +297,7 @@ components:
         amount:
           type: number
           minimum: 0
-          description: Monetary amount in EUR with at most two decimal places; use Java BigDecimal, not floating point.
+          description: Amount in euros with at most two decimal places.
           example: 8.95
         currency:
           type: string
@@ -335,9 +328,7 @@ components:
           format: uri-reference
         code:
           type: string
-          description: Stable machine-readable error code; e.g. VALIDATION_FAILED, IDEMPOTENCY_CONFLICT,
-            IDEMPOTENCY_IN_PROGRESS, UNSUPPORTED_COUNTRY, WEIGHT_LIMIT_EXCEEDED, SAME_DAY_NOT_SUPPORTED,
-            ORDER_NOT_FOUND, PRICING_UNAVAILABLE, INTERNAL_ERROR
+          description: Machine-readable code identifying the error.
         correlationId:
           type: string
         orderStatus:
@@ -354,5 +345,4 @@ components:
                 type: string
               message:
                 type: string
-      description: RFC 9457-compatible problem. Do not include raw input, personal data, stack traces,
-        or internal hostnames.
+      description: Error details in RFC 9457 Problem Details format.
