@@ -238,7 +238,7 @@ components:
         code:
           type: string
           description: 'Machine-readable code identifying the error. Known values: VALIDATION_FAILED,
-            INTERNAL_ERROR. Clients must tolerate new values.'
+            REQUEST_NOT_SUPPORTED, INTERNAL_ERROR. Clients must tolerate new values.'
           example: VALIDATION_FAILED
         correlationId:
           type: string

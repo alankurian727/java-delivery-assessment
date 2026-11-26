@@ -1,6 +1,12 @@
 spring:
   application:
     name: pricing-eligibility-api
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      use-big-decimal-for-floats: true
+    generator:
+      write-bigdecimal-as-plain: true
 
 springdoc:
   swagger-ui:
