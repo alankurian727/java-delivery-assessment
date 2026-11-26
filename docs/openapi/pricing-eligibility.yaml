@@ -4,8 +4,6 @@ info:
   version: 1.0.0
   description: Internal stateless API. Valid evaluations return HTTP 200 for both eligible and ineligible
     results. No personal names or delivery order persistence.
-servers:
-- url: http://localhost:8081
 paths:
   /api/v1/pricing/evaluations:
     post:
