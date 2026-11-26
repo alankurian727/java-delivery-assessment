@@ -1,8 +1,8 @@
 package com.abnamro.delivery.pricing.service;
 
-import static com.abnamro.delivery.pricing.support.TestData.REQUEST_ID;
-import static com.abnamro.delivery.pricing.support.TestData.shipment;
-import static com.abnamro.delivery.pricing.support.TestData.tariff;
+import static com.abnamro.delivery.pricing.fixture.TestData.REQUEST_ID;
+import static com.abnamro.delivery.pricing.fixture.TestData.shipment;
+import static com.abnamro.delivery.pricing.fixture.TestData.tariff;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.abnamro.delivery.pricing.configuration.TariffProperties;

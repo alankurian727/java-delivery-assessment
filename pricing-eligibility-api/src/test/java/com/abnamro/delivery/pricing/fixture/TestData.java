@@ -1,4 +1,4 @@
-package com.abnamro.delivery.pricing.support;
+package com.abnamro.delivery.pricing.fixture;
 
 import com.abnamro.delivery.pricing.configuration.TariffProperties;
 import com.abnamro.delivery.pricing.configuration.TariffProperties.UrbanArea;
