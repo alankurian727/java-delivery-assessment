@@ -30,10 +30,10 @@ For an optional local override, set `DELIVERY_DB_PASSWORD` in the shell or in a 
 Each service has its own Maven wrapper. A local Maven installation is optional.
 
 From the repository root, build both services with JDK 21 using the root
-aggregator POM and the Delivery Order wrapper:
+aggregator POM and the root Maven wrapper:
 
 ```sh
-./delivery-order-api/mvnw -f pom.xml clean verify
+./mvnw clean verify
 ```
 
 To build either service independently, point its wrapper at its own POM:
