@@ -38,7 +38,7 @@ public class PricingEvaluationService {
         for (EligibilityRule rule : eligibilityRules) {
             Optional<Rejection> rejection = rule.check(shipment);
             if (rejection.isPresent()) {
-                return new EvaluationResult.Rejected(shipment.requestId(), rejection.get(), evaluatedAt);
+                return EvaluationResult.rejected(shipment.requestId(), rejection.get(), evaluatedAt);
             }
         }
 
@@ -49,6 +49,6 @@ public class PricingEvaluationService {
         Money total = components.stream()
                 .map(PriceComponent::amount)
                 .reduce(Money.ZERO, Money::plus);
-        return new EvaluationResult.Eligible(shipment.requestId(), total, components, evaluatedAt);
+        return EvaluationResult.eligible(shipment.requestId(), total, components, evaluatedAt);
     }
 }

@@ -30,21 +30,21 @@ public interface PricingApiMapper {
     Shipment toShipment(PricingEvaluationRequest request);
 
     default PricingEvaluationResponse toResponse(EvaluationResult result) {
-        return switch (result) {
-            case EvaluationResult.Eligible eligible -> toEligibleEvaluation(eligible);
-            case EvaluationResult.Rejected rejected -> toRejectedEvaluation(rejected);
-        };
+        if (result.isEligible()) {
+            return toEligibleEvaluation(result);
+        }
+        return toRejectedEvaluation(result);
     }
 
     @Mapping(target = "eligible", constant = "true")
     @Mapping(target = "price", source = "total")
     @Mapping(target = "priceComponents", source = "components")
-    EligibleEvaluation toEligibleEvaluation(EvaluationResult.Eligible eligible);
+    EligibleEvaluation toEligibleEvaluation(EvaluationResult result);
 
     @Mapping(target = "eligible", constant = "false")
     @Mapping(target = "rejectionCode", source = "rejection.code")
     @Mapping(target = "message", source = "rejection.message")
-    RejectedEvaluation toRejectedEvaluation(EvaluationResult.Rejected rejected);
+    RejectedEvaluation toRejectedEvaluation(EvaluationResult result);
 
     @Mapping(target = "currency", constant = "EUR")
     com.abnamro.delivery.pricing.api.model.Money toApiMoney(Money money);
