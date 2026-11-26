@@ -28,8 +28,8 @@ For an optional local override, set `DELIVERY_DB_PASSWORD` in the shell or in a 
 ## Example requests
 
 With the stack running, these `curl` commands call the Pricing & Eligibility API.
-[`http/pricing-eligibility.http`](http/pricing-eligibility.http) covers every
-scenario and runs from IntelliJ IDEA or VS Code with the REST Client extension.
+[`docs/examples/pricing-eligibility.md`](docs/examples/pricing-eligibility.md) has
+`curl` commands for every scenario, each with its expected result.
 
 Eligible delivery, the assignment's example (expect HTTP 200 and a price of 8.95):
 
