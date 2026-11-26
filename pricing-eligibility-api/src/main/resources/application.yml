@@ -2,6 +2,10 @@ spring:
   application:
     name: pricing-eligibility-api
 
+springdoc:
+  swagger-ui:
+    url: /openapi/pricing-eligibility.yaml
+
 server:
   port: 8081
 

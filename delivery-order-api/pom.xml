@@ -19,6 +19,7 @@
     <properties>
         <java.version>21</java.version>
         <springdoc.version>2.8.16</springdoc.version>
+        <openapi-generator.version>7.12.0</openapi-generator.version>
         <resilience4j.version>2.3.0</resilience4j.version>
         <wiremock.version>3.13.2</wiremock.version>
     </properties>
@@ -97,6 +98,55 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>${openapi-generator.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-server-api</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/static/openapi/delivery-order.yaml</inputSpec>
+                            <generatorName>spring</generatorName>
+                            <apiPackage>com.abnamro.delivery.order.api</apiPackage>
+                            <modelPackage>com.abnamro.delivery.order.api.model</modelPackage>
+                            <generateSupportingFiles>false</generateSupportingFiles>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <skipDefaultInterface>true</skipDefaultInterface>
+                                <useSpringBoot3>true</useSpringBoot3>
+                                <useBeanValidation>true</useBeanValidation>
+                                <useTags>true</useTags>
+                                <openApiNullable>false</openApiNullable>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-pricing-client-models</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi-client/pricing-eligibility.yaml</inputSpec>
+                            <generatorName>spring</generatorName>
+                            <modelPackage>com.abnamro.delivery.order.pricing.model</modelPackage>
+                            <generateApis>false</generateApis>
+                            <generateSupportingFiles>false</generateSupportingFiles>
+                            <!-- PricingEvaluationResponse (oneOf without discriminator) is skipped: the pricing client
+                                 maps each response to EligibleEvaluation or RejectedEvaluation by its eligible flag. -->
+                            <modelsToGenerate>PricingEvaluationRequest,EligibleEvaluation,RejectedEvaluation,Money,PriceComponent,DeliveryType,Problem,Problem_violations_inner</modelsToGenerate>
+                            <configOptions>
+                                <useSpringBoot3>true</useSpringBoot3>
+                                <useBeanValidation>true</useBeanValidation>
+                                <openApiNullable>false</openApiNullable>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
