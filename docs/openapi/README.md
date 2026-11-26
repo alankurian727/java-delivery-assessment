@@ -15,11 +15,13 @@ Both standalone contracts use OpenAPI 3.0.3.
 - Equivalent completed submissions replay their original terminal status/body (201 and Location for success, 422 for rejection). Different content for the same key returns 409; concurrent matching requests still processing may receive 409 with code IDEMPOTENCY_IN_PROGRESS. A 503 permits reevaluation with the same key and input. Compare normalized requests, not raw JSON bytes.
 - Pricing timeout, upstream server error, and invalid upstream response map to 503 without confirmation. GET uses the persisted historical price and does not call Pricing.
 - Idempotency keys are opaque, case-sensitive, 1–128 printable non-space ASCII characters. UUID order/request IDs and UTC timestamps are used. Examples contain fictional labels, not real customer data.
+- Pricing responses are open for additive change: clients ignore unknown properties and tolerate unknown price component types, rejection codes and problem codes. The eligible flag distinguishes eligible from rejected results.
+- Retryable responses (503, and 409 with IDEMPOTENCY_IN_PROGRESS) carry a Retry-After header.
 - Money is represented as a JSON number, mapped to BigDecimal in Java. Enforce at most two decimal places in application validation and monetary calculations. The schemas deliberately omit fractional multipleOf to avoid floating-point validator inconsistencies. No float/double calculations.
 
 ## Pricing assumption to confirm
 
-The assignment's illustrative NEXT_DAY breakdown differs from its explicit tariff table. Follow the table: EUR 6.95 base + EUR 1.00 weight surcharge for 2,750 g + EUR 1.00 urban-area surcharge = EUR 8.95. No separate NEXT_DAY surcharge is added. Assume the urban-area surcharge is charged once if either endpoint is in the specified postal-code range; clarify with the assessor if destination-only pricing is intended.
+The assignment's illustrative NEXT_DAY breakdown differs from its explicit tariff table. Follow the table: EUR 6.95 base + EUR 1.00 weight surcharge for 2,750 g + EUR 1.00 urban-area surcharge = EUR 8.95. No separate NEXT_DAY surcharge is added. The urban-area surcharge applies if either endpoint is in 1000AA–1099ZZ. The assignment's example rules out destination-only pricing: only the origin (1012AB) is urban there, and the total is still EUR 8.95. Assume the surcharge is charged once when both endpoints are urban; this remains to confirm with the assessor.
 
 ## Scope
 
