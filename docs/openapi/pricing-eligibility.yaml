@@ -2,8 +2,7 @@ openapi: 3.0.3
 info:
   title: Pricing and Eligibility API
   version: 1.0.0
-  description: Internal stateless API. Valid evaluations return HTTP 200 for both eligible and ineligible
-    results. No personal names or delivery order persistence.
+  description: Evaluate eligibility and calculate prices for domestic parcel deliveries.
 paths:
   /api/v1/pricing/evaluations:
     post:
@@ -11,14 +10,12 @@ paths:
       tags:
       - Pricing
       summary: Evaluate delivery eligibility and price
-      description: Delivery Order validates country eligibility before calling this API. Apply pricing
-        tariffs and weight, urban-area and same-day rules. A valid but unsupported delivery returns a
-        typed rejected result, not an HTTP error.
+      description: Returns a calculated price for eligible deliveries or a reason for rejection.
       parameters:
       - name: X-Correlation-ID
         in: header
         required: false
-        description: Optional caller correlation identifier; generate one when absent.
+        description: Optional identifier for tracing a request across services.
         schema:
           type: string
           minLength: 1
@@ -37,7 +34,7 @@ paths:
               deliveryType: NEXT_DAY
       responses:
         '200':
-          description: Eligible quote or rejected evaluation
+          description: Pricing evaluation result, including business rejections.
           content:
             application/json:
               schema:
@@ -104,20 +101,18 @@ components:
         originPostalCode:
           type: string
           pattern: ^[1-9][0-9]{3} ?[A-Za-z]{2}$
-          description: Four digits followed by two letters, with optional single space; normalize to uppercase
-            without space.
+          description: Dutch postal code, with or without a space (e.g. 1012AB or 1012 AB).
           example: 1012 AB
         destinationPostalCode:
           type: string
           pattern: ^[1-9][0-9]{3} ?[A-Za-z]{2}$
-          description: Four digits followed by two letters, with optional single space; normalize to uppercase
-            without space.
+          description: Dutch postal code, with or without a space (e.g. 1012AB or 1012 AB).
           example: 1012 AB
         weightInGrams:
           type: integer
           format: int64
           minimum: 1
-          description: Positive grams; above 20000 is a business rejection, not malformed input.
+          description: Parcel weight in grams. Deliveries above 20,000 grams are not eligible.
         deliveryType:
           $ref: '#/components/schemas/DeliveryType'
     DeliveryType:
@@ -135,7 +130,7 @@ components:
         amount:
           type: number
           minimum: 0
-          description: Monetary amount in EUR with at most two decimal places; use Java BigDecimal, not floating point.
+          description: Amount in euros with at most two decimal places.
           example: 8.95
         currency:
           type: string
@@ -156,7 +151,7 @@ components:
         amount:
           type: number
           minimum: 0
-          description: Monetary amount in EUR with at most two decimal places; use Java BigDecimal, not floating point.
+          description: Amount in euros with at most two decimal places.
           example: 8.95
     PricingEvaluationResponse:
       oneOf:
@@ -256,5 +251,4 @@ components:
                 type: string
               message:
                 type: string
-      description: RFC 9457-compatible problem. Do not include raw input, personal data, stack traces,
-        or internal hostnames.
+      description: Error details in RFC 9457 Problem Details format.
