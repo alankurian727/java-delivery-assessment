@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: delivery-order-api
+  datasource:
+    url: ${DELIVERY_DB_URL:jdbc:postgresql://localhost:5432/delivery}
+    username: ${DELIVERY_DB_USER:delivery}
+    password: ${DELIVERY_DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+delivery:
+  pricing:
+    base-url: ${PRICING_BASE_URL:http://localhost:8081}
