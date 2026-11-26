@@ -6,5 +6,4 @@ logging:
       # and every addKeyValue field (event, pricingRequestId, outcome, ...) are separately searchable.
       console: ecs
   level:
-    # Rule-by-rule DEBUG lines help when checking prices in a shared environment.
     com.abnamro.delivery: DEBUG

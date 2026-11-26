@@ -6,6 +6,4 @@ logging:
       # and every addKeyValue field (event, pricingRequestId, outcome, ...) are separately searchable.
       console: ecs
   level:
-    # Frameworks only report problems; their INFO start-up and housekeeping lines are noise in production.
-    # The application stays at the INFO default from application.yml, so rule-level DEBUG lines are hidden.
-    root: WARN
+    root: INFO
