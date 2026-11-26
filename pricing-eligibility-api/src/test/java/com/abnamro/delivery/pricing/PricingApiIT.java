@@ -159,6 +159,7 @@ class PricingApiIT {
         ResponseEntity<String> response = restTemplate.getForEntity(URL, String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getHeaders().getAllow()).containsExactly(org.springframework.http.HttpMethod.POST);
         assertThat(json(response).get("code").asText()).isEqualTo("REQUEST_NOT_SUPPORTED");
     }
 

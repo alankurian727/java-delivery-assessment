@@ -12,7 +12,6 @@ import com.abnamro.delivery.pricing.configuration.CorrelationIdFilter;
 import com.abnamro.delivery.pricing.domain.DomainValidationException;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -78,16 +77,23 @@ public class ApiExceptionHandler {
         return respond(logInvalidRequest(problem, "invalid_value"));
     }
 
-    /** Wrong method, content type, Accept header or path: keep Spring's status instead of returning 500. */
+    /**
+     * Wrong method, content type, Accept header or path: keep Spring's status and its standard headers,
+     * such as Allow on 405 and Accept on 415, instead of returning 500.
+     */
     @ExceptionHandler({
             HttpRequestMethodNotSupportedException.class,
             HttpMediaTypeNotSupportedException.class,
             HttpMediaTypeNotAcceptableException.class,
             NoResourceFoundException.class})
     ResponseEntity<Problem> handleUnsupportedRequest(Exception ex) {
-        HttpStatusCode status = ((ErrorResponse) ex).getStatusCode();
-        HttpStatus httpStatus = HttpStatus.valueOf(status.value());
-        return respond(problem(httpStatus, httpStatus.getReasonPhrase(), REQUEST_NOT_SUPPORTED));
+        ErrorResponse errorResponse = (ErrorResponse) ex;
+        HttpStatus httpStatus = HttpStatus.valueOf(errorResponse.getStatusCode().value());
+        Problem problem = problem(httpStatus, httpStatus.getReasonPhrase(), REQUEST_NOT_SUPPORTED);
+        return ResponseEntity.status(httpStatus)
+                .headers(errorResponse.getHeaders())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem);
     }
 
     @ExceptionHandler(Exception.class)
