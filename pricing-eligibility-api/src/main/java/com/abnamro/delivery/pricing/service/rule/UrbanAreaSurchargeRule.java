@@ -7,6 +7,8 @@ import com.abnamro.delivery.pricing.domain.PriceComponent;
 import com.abnamro.delivery.pricing.domain.PriceComponentType;
 import com.abnamro.delivery.pricing.domain.Shipment;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +16,8 @@ import org.springframework.stereotype.Component;
 @Component
 @Order(3)
 public class UrbanAreaSurchargeRule implements PriceComponentRule {
+
+    private static final Logger log = LoggerFactory.getLogger(UrbanAreaSurchargeRule.class);
 
     private final PostalCode from;
     private final PostalCode to;
@@ -27,7 +31,12 @@ public class UrbanAreaSurchargeRule implements PriceComponentRule {
 
     @Override
     public Optional<PriceComponent> apply(Shipment shipment) {
-        if (shipment.origin().isWithin(from, to) || shipment.destination().isWithin(from, to)) {
+        boolean originUrban = shipment.origin().isWithin(from, to);
+        boolean destinationUrban = shipment.destination().isWithin(from, to);
+        boolean applies = originUrban || destinationUrban;
+        log.debug("event=pricing.rule rule=UrbanAreaSurchargeRule result={} originUrban={} destinationUrban={}",
+                applies ? "applied" : "skipped", originUrban, destinationUrban);
+        if (applies) {
             return Optional.of(new PriceComponent(PriceComponentType.URBAN_AREA_SURCHARGE, surcharge));
         }
         return Optional.empty();
