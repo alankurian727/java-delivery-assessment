@@ -25,6 +25,45 @@ stack. PostgreSQL data persists in the named volume.
 
 For an optional local override, set `DELIVERY_DB_PASSWORD` in the shell or in a root `.env` file before the first startup. An existing database keeps its current password. See [deployment improvements](docs/improvements/) for production configuration.
 
+## Example requests
+
+With the stack running, these `curl` commands call the Pricing & Eligibility API.
+[`http/pricing-eligibility.http`](http/pricing-eligibility.http) covers every
+scenario and runs from IntelliJ IDEA or VS Code with the REST Client extension.
+
+Eligible delivery, the assignment's example (expect HTTP 200 and a price of 8.95):
+
+```sh
+curl -s http://localhost:8081/api/v1/pricing/evaluations \
+  -H 'Content-Type: application/json' \
+  -H 'X-Correlation-ID: example-1' \
+  -d '{"requestId":"7cb82db3-fe9a-49e1-a0f9-fdeae2455869","originPostalCode":"1012 AB","destinationPostalCode":"5611EM","weightInGrams":2750,"deliveryType":"NEXT_DAY"}'
+```
+
+Business rejection (expect HTTP 200 with `"eligible":false` and `WEIGHT_LIMIT_EXCEEDED`):
+
+```sh
+curl -s http://localhost:8081/api/v1/pricing/evaluations \
+  -H 'Content-Type: application/json' \
+  -d '{"requestId":"7cb82db3-fe9a-49e1-a0f9-fdeae2455869","originPostalCode":"5611EM","destinationPostalCode":"3011AB","weightInGrams":20001,"deliveryType":"STANDARD"}'
+```
+
+Same-day delivery between different areas (expect HTTP 200 with `SAME_DAY_NOT_SUPPORTED`):
+
+```sh
+curl -s http://localhost:8081/api/v1/pricing/evaluations \
+  -H 'Content-Type: application/json' \
+  -d '{"requestId":"7cb82db3-fe9a-49e1-a0f9-fdeae2455869","originPostalCode":"5611EM","destinationPostalCode":"1012AB","weightInGrams":100,"deliveryType":"SAME_DAY"}'
+```
+
+Invalid request (expect HTTP 400 Problem Details with `VALIDATION_FAILED`):
+
+```sh
+curl -s http://localhost:8081/api/v1/pricing/evaluations \
+  -H 'Content-Type: application/json' \
+  -d '{"requestId":"7cb82db3-fe9a-49e1-a0f9-fdeae2455869","originPostalCode":"0123AB","destinationPostalCode":"5611EM","weightInGrams":0,"deliveryType":"NEXT_DAY"}'
+```
+
 ## Build and run with Maven
 
 Each service has its own Maven wrapper. A local Maven installation is optional.

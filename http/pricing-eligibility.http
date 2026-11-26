@@ -1,0 +1,203 @@
+# Pricing & Eligibility API: example requests for every scenario.
+# Run with the IntelliJ HTTP Client or the VS Code "REST Client" extension.
+# Start the service first: docker compose up --build --wait  (or run it with Maven).
+# Business rejections return HTTP 200 with "eligible": false; only invalid requests return 400.
+
+@pricingUrl = http://localhost:8081
+@requestId = 7cb82db3-fe9a-49e1-a0f9-fdeae2455869
+
+### Health check -> 200 {"status":"UP"}
+GET {{pricingUrl}}/actuator/health
+
+########## Eligible: HTTP 200, "eligible": true ##########
+
+### Assignment example: NEXT_DAY 2,750 g from an urban area -> 8.95 (6.95 base + 1.00 weight + 1.00 urban)
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+X-Correlation-ID: example-eligible-1
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "1012 AB",
+  "destinationPostalCode": "5611EM",
+  "weightInGrams": 2750,
+  "deliveryType": "NEXT_DAY"
+}
+
+### STANDARD 2,000 g, outside the urban area -> 4.95 (base price only, no weight surcharge)
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "5611EM",
+  "destinationPostalCode": "3011AB",
+  "weightInGrams": 2000,
+  "deliveryType": "STANDARD"
+}
+
+### STANDARD 20,000 g, the heaviest eligible parcel -> 9.95 (4.95 base + 5.00 weight)
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "5611EM",
+  "destinationPostalCode": "3011AB",
+  "weightInGrams": 20000,
+  "deliveryType": "STANDARD"
+}
+
+### Both postal codes urban -> 5.95 (urban surcharge charged once)
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "1012AB",
+  "destinationPostalCode": "1099ZZ",
+  "weightInGrams": 500,
+  "deliveryType": "STANDARD"
+}
+
+### SAME_DAY within the same four-digit area, 15,000 g -> 17.95 (11.95 base + 5.00 weight + 1.00 urban)
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "1012AB",
+  "destinationPostalCode": "1012XY",
+  "weightInGrams": 15000,
+  "deliveryType": "SAME_DAY"
+}
+
+########## Business rejections: HTTP 200, "eligible": false ##########
+
+### Weight above 20,000 g -> WEIGHT_LIMIT_EXCEEDED
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "5611EM",
+  "destinationPostalCode": "3011AB",
+  "weightInGrams": 20001,
+  "deliveryType": "STANDARD"
+}
+
+### SAME_DAY between different four-digit areas -> SAME_DAY_NOT_SUPPORTED
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "5611EM",
+  "destinationPostalCode": "1012AB",
+  "weightInGrams": 100,
+  "deliveryType": "SAME_DAY"
+}
+
+### Both rules fail -> WEIGHT_LIMIT_EXCEEDED (the weight rule is checked first)
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "5611EM",
+  "destinationPostalCode": "1012AB",
+  "weightInGrams": 25000,
+  "deliveryType": "SAME_DAY"
+}
+
+########## Invalid requests: HTTP 400, application/problem+json, code VALIDATION_FAILED ##########
+
+### Missing field (destinationPostalCode) -> 400 with a violation for that field
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+X-Correlation-ID: example-invalid-1
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "1012AB",
+  "weightInGrams": 2750,
+  "deliveryType": "NEXT_DAY"
+}
+
+### Invalid Dutch postal code -> 400 (the value is not echoed in the response)
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "0123AB",
+  "destinationPostalCode": "5611EM",
+  "weightInGrams": 2750,
+  "deliveryType": "NEXT_DAY"
+}
+
+### Zero weight -> 400
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "1012AB",
+  "destinationPostalCode": "5611EM",
+  "weightInGrams": 0,
+  "deliveryType": "NEXT_DAY"
+}
+
+### Negative weight -> 400
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "1012AB",
+  "destinationPostalCode": "5611EM",
+  "weightInGrams": -1,
+  "deliveryType": "NEXT_DAY"
+}
+
+### Unsupported delivery type -> 400
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "1012AB",
+  "destinationPostalCode": "5611EM",
+  "weightInGrams": 2750,
+  "deliveryType": "EXPRESS"
+}
+
+### Malformed JSON -> 400
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+
+{"requestId": "{{requestId}}", "originPostalCode": "1012AB"
+
+### X-Correlation-ID longer than 128 characters -> 400
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: application/json
+X-Correlation-ID: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+{
+  "requestId": "{{requestId}}",
+  "originPostalCode": "1012AB",
+  "destinationPostalCode": "5611EM",
+  "weightInGrams": 2750,
+  "deliveryType": "NEXT_DAY"
+}
+
+########## Unsupported requests: Problem Details with code REQUEST_NOT_SUPPORTED ##########
+
+### Wrong HTTP method -> 405
+GET {{pricingUrl}}/api/v1/pricing/evaluations
+
+### Wrong content type -> 415
+POST {{pricingUrl}}/api/v1/pricing/evaluations
+Content-Type: text/plain
+
+not json
