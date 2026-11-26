@@ -20,6 +20,7 @@
         <java.version>21</java.version>
         <springdoc.version>2.8.16</springdoc.version>
         <openapi-generator.version>7.12.0</openapi-generator.version>
+        <contracts.dir>${project.basedir}/../docs/openapi</contracts.dir>
         <resilience4j.version>2.3.0</resilience4j.version>
         <wiremock.version>3.13.2</wiremock.version>
     </properties>
@@ -94,6 +95,19 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- Serve this service's own contract from docs/openapi at /openapi/delivery-order.yaml. -->
+            <resource>
+                <directory>${contracts.dir}</directory>
+                <targetPath>static/openapi</targetPath>
+                <includes>
+                    <include>delivery-order.yaml</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
@@ -110,7 +124,7 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
-                            <inputSpec>${project.basedir}/src/main/resources/static/openapi/delivery-order.yaml</inputSpec>
+                            <inputSpec>${contracts.dir}/delivery-order.yaml</inputSpec>
                             <generatorName>spring</generatorName>
                             <apiPackage>com.abnamro.delivery.order.api</apiPackage>
                             <modelPackage>com.abnamro.delivery.order.api.model</modelPackage>
@@ -131,7 +145,7 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
-                            <inputSpec>${project.basedir}/src/main/resources/openapi-client/pricing-eligibility.yaml</inputSpec>
+                            <inputSpec>${contracts.dir}/pricing-eligibility.yaml</inputSpec>
                             <generatorName>spring</generatorName>
                             <modelPackage>com.abnamro.delivery.order.pricing.model</modelPackage>
                             <generateApis>false</generateApis>

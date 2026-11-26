@@ -49,6 +49,16 @@ To build either service independently, point its wrapper at its own POM:
 ./pricing-eligibility-api/mvnw -f pricing-eligibility-api/pom.xml clean verify
 ```
 
+Both services generate their API interfaces and models from the shared
+OpenAPI contracts in [`docs/openapi/`](docs/openapi/), so a service build needs
+that folder from the same checkout. To build a single service image, run
+`docker build` from the repository root:
+
+```sh
+docker build -f delivery-order-api/Dockerfile -t delivery-order-api .
+docker build -f pricing-eligibility-api/Dockerfile -t pricing-eligibility-api .
+```
+
 Run Pricing with `cd pricing-eligibility-api && ./mvnw spring-boot:run`.
 Its health endpoint is `http://localhost:8081/actuator/health`.
 
