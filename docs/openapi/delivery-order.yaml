@@ -5,8 +5,6 @@ info:
   description: Public delivery workflow API. Only confirmed orders are created; rejected and temporarily
     unavailable outcomes are represented as attempt statuses in problem responses. Production authentication
     and authorization are outside the assessment contract.
-servers:
-- url: http://localhost:8080
 paths:
   /api/v1/delivery-orders:
     post:
