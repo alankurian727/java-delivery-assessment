@@ -1,8 +1,5 @@
-# Shared development environment: JSON logs for the log platform, detailed application logs.
+# Shared development environment: detailed application logs.
 logging:
-  structured:
-    format:
-      console: ecs
   level:
     root: INFO
     com.abnamro.delivery: DEBUG

@@ -39,6 +39,11 @@ springdoc:
 server:
   port: 8081
 
+logging:
+  pattern:
+    # Adds the request's correlation ID to every log line, for example [demo-1].
+    correlation: "[%X{correlationId:-}] "
+
 management:
   endpoints:
     web:

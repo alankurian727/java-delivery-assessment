@@ -42,12 +42,8 @@ public class PricingEvaluationService {
         for (EligibilityRule rule : eligibilityRules) {
             Optional<Rejection> rejection = rule.check(shipment);
             if (rejection.isPresent()) {
-                log.atInfo().setMessage("Pricing evaluation rejected")
-                        .addKeyValue("event", "pricing.evaluated")
-                        .addKeyValue("pricingRequestId", shipment.requestId())
-                        .addKeyValue("outcome", "REJECTED")
-                        .addKeyValue("rejectionCode", rejection.get().code())
-                        .log();
+                log.info("event=pricing.evaluated pricingRequestId={} outcome=REJECTED rejectionCode={}",
+                        shipment.requestId(), rejection.get().code());
                 return EvaluationResult.rejected(shipment.requestId(), rejection.get(), evaluatedAt);
             }
         }
@@ -59,13 +55,8 @@ public class PricingEvaluationService {
         Money total = components.stream()
                 .map(PriceComponent::amount)
                 .reduce(Money.ZERO, Money::plus);
-        log.atInfo().setMessage("Pricing evaluation eligible")
-                .addKeyValue("event", "pricing.evaluated")
-                .addKeyValue("pricingRequestId", shipment.requestId())
-                .addKeyValue("outcome", "ELIGIBLE")
-                .addKeyValue("deliveryType", shipment.deliveryType())
-                .addKeyValue("total", total.amount())
-                .log();
+        log.info("event=pricing.evaluated pricingRequestId={} outcome=ELIGIBLE deliveryType={} total={}",
+                shipment.requestId(), shipment.deliveryType(), total.amount());
         return EvaluationResult.eligible(shipment.requestId(), total, components, evaluatedAt);
     }
 }

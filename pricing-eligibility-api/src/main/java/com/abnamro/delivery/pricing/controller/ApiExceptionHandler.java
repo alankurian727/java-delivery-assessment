@@ -87,10 +87,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<Problem> handleUnexpected(Exception ex) {
-        log.atError().setMessage("Unexpected error while evaluating pricing")
-                .addKeyValue("event", "pricing.failed")
-                .setCause(ex)
-                .log();
+        log.error("event=pricing.failed message=\"Unexpected error while evaluating pricing\"", ex);
         return respond(problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", INTERNAL_ERROR));
     }
 
