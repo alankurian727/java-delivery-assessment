@@ -7,6 +7,7 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.abnamro.delivery.pricing.configuration.CorrelationIdFilter;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -86,7 +87,10 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<Problem> handleUnexpected(Exception ex) {
-        log.error("Unexpected error while evaluating pricing", ex);
+        log.atError().setMessage("Unexpected error while evaluating pricing")
+                .addKeyValue("event", "pricing.failed")
+                .setCause(ex)
+                .log();
         return respond(problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", INTERNAL_ERROR));
     }
 
@@ -96,7 +100,7 @@ public class ApiExceptionHandler {
 
     private static Problem problem(HttpStatus status, String title, String code) {
         Problem problem = new Problem("about:blank", title, status.value(), code);
-        problem.setCorrelationId(MDC.get("correlationId"));
+        problem.setCorrelationId(MDC.get(CorrelationIdFilter.MDC_KEY));
         return problem;
     }
 

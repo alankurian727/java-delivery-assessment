@@ -11,6 +11,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -19,6 +21,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class PricingEvaluationService {
+
+    private static final Logger log = LoggerFactory.getLogger(PricingEvaluationService.class);
 
     private final List<EligibilityRule> eligibilityRules;
     private final List<PriceComponentRule> priceComponentRules;
@@ -38,6 +42,12 @@ public class PricingEvaluationService {
         for (EligibilityRule rule : eligibilityRules) {
             Optional<Rejection> rejection = rule.check(shipment);
             if (rejection.isPresent()) {
+                log.atInfo().setMessage("Pricing evaluation rejected")
+                        .addKeyValue("event", "pricing.evaluated")
+                        .addKeyValue("pricingRequestId", shipment.requestId())
+                        .addKeyValue("outcome", "REJECTED")
+                        .addKeyValue("rejectionCode", rejection.get().code())
+                        .log();
                 return EvaluationResult.rejected(shipment.requestId(), rejection.get(), evaluatedAt);
             }
         }
@@ -49,6 +59,13 @@ public class PricingEvaluationService {
         Money total = components.stream()
                 .map(PriceComponent::amount)
                 .reduce(Money.ZERO, Money::plus);
+        log.atInfo().setMessage("Pricing evaluation eligible")
+                .addKeyValue("event", "pricing.evaluated")
+                .addKeyValue("pricingRequestId", shipment.requestId())
+                .addKeyValue("outcome", "ELIGIBLE")
+                .addKeyValue("deliveryType", shipment.deliveryType())
+                .addKeyValue("total", total.amount())
+                .log();
         return EvaluationResult.eligible(shipment.requestId(), total, components, evaluatedAt);
     }
 }

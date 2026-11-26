@@ -105,6 +105,29 @@ class PricingApiIT {
     }
 
     @Test
+    void returnsTheCallersCorrelationIdAndGeneratesOneWhenMissing() throws Exception {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Correlation-ID", "order-123");
+
+        ResponseEntity<String> withId = post(request("1012AB", "5611EM", 2750, "NEXT_DAY"), headers);
+        ResponseEntity<String> withoutId = post(request("1012AB", "5611EM", 2750, "NEXT_DAY"), new HttpHeaders());
+
+        assertThat(withId.getHeaders().getFirst("X-Correlation-ID")).isEqualTo("order-123");
+        assertThat(withoutId.getHeaders().getFirst("X-Correlation-ID")).isNotBlank();
+    }
+
+    @Test
+    void includesCorrelationIdInProblemDetails() throws Exception {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Correlation-ID", "order-456");
+
+        ResponseEntity<String> response = post(request("1012AB", "5611EM", 0, "NEXT_DAY"), headers);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(json(response).get("correlationId").asText()).isEqualTo("order-456");
+    }
+
+    @Test
     void rejectsTooLongCorrelationId() throws Exception {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Correlation-ID", "x".repeat(129));

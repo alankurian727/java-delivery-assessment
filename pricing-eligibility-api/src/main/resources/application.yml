@@ -36,6 +36,11 @@ springdoc:
 server:
   port: 8081
 
+logging:
+  structured:
+    format:
+      console: ecs
+
 management:
   endpoints:
     web:
