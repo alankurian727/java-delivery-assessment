@@ -176,7 +176,7 @@
                             <generateSupportingFiles>false</generateSupportingFiles>
                             <!-- PricingEvaluationResponse (oneOf without discriminator) is skipped: the pricing client
                                  maps each response to EligibleEvaluation or RejectedEvaluation by its eligible flag. -->
-                            <modelsToGenerate>PricingEvaluationRequest,EligibleEvaluation,RejectedEvaluation,Money,PriceComponent,DeliveryType,Problem,Problem_violations_inner</modelsToGenerate>
+                            <modelsToGenerate>PricingEvaluationRequest,EligibleEvaluation,RejectedEvaluation,Money,PriceComponent,DeliveryType</modelsToGenerate>
                             <configOptions>
                                 <useSpringBoot3>true</useSpringBoot3>
                                 <useBeanValidation>true</useBeanValidation>
