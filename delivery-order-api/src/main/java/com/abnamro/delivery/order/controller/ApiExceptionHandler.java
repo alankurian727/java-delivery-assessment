@@ -2,7 +2,7 @@ package com.abnamro.delivery.order.controller;
 
 import com.abnamro.delivery.order.api.model.OrderStatus;
 import com.abnamro.delivery.order.api.model.Problem;
-import com.abnamro.delivery.order.api.model.ProblemViolationsInner;
+import com.abnamro.delivery.order.api.model.Violation;
 import com.abnamro.delivery.order.configuration.CorrelationIdFilter;
 import com.abnamro.delivery.order.exception.DeliveryRejectedException;
 import com.abnamro.delivery.order.exception.IdempotencyConflictException;
@@ -21,17 +21,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
 import org.springframework.web.ErrorResponse;
-import org.springframework.web.HttpMediaTypeNotAcceptableException;
-import org.springframework.web.HttpMediaTypeNotSupportedException;
-import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Turns every error into an RFC 9457 Problem Details response (ADR-004).
@@ -46,55 +41,51 @@ public class ApiExceptionHandler {
     static final String REQUEST_NOT_SUPPORTED = "REQUEST_NOT_SUPPORTED";
     static final String INTERNAL_ERROR = "INTERNAL_ERROR";
 
+    // Generated parameter names of the validated headers, shown to clients as the header names.
     private static final Map<String, String> HEADER_NAMES =
             Map.of("idempotencyKey", "Idempotency-Key", "xCorrelationID", "X-Correlation-ID");
 
-    /** Bean Validation errors on the request body. */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    ResponseEntity<Problem> handleInvalidBody(MethodArgumentNotValidException ex) {
-        Problem problem = validationProblem();
-        ex.getBindingResult().getFieldErrors().forEach(error -> problem.addViolationsItem(toViolation(error)));
-        return respond(logInvalidRequest(problem, "validation_failed"));
-    }
-
-    /** Invalid headers: the generated interface is @Validated, so Spring's method validation checks them. */
-    @ExceptionHandler(ConstraintViolationException.class)
-    ResponseEntity<Problem> handleConstraintViolation(ConstraintViolationException ex) {
-        Problem problem = validationProblem();
-        ex.getConstraintViolations().forEach(violation -> problem.addViolationsItem(
-                new ProblemViolationsInner(headerName(lastNodeName(violation)), violation.getMessage())));
-        return respond(logInvalidRequest(problem, "validation_failed"));
-    }
-
-    /** The required Idempotency-Key header is missing. */
-    @ExceptionHandler(MissingRequestHeaderException.class)
-    ResponseEntity<Problem> handleMissingHeader(MissingRequestHeaderException ex) {
-        Problem problem = validationProblem();
-        problem.addViolationsItem(new ProblemViolationsInner(ex.getHeaderName(), "must not be null"));
-        return respond(logInvalidRequest(problem, "missing_header"));
-    }
-
-    /** An orderId that is not a UUID. */
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    ResponseEntity<Problem> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-        Problem problem = validationProblem();
-        problem.addViolationsItem(new ProblemViolationsInner(ex.getName(), "has an invalid format"));
-        return respond(logInvalidRequest(problem, "invalid_parameter"));
-    }
-
-    /** Malformed JSON, wrong JSON types, fractional numbers or an unknown enum value. */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<Problem> handleUnreadableBody(HttpMessageNotReadableException ex) {
-        Problem problem = validationProblem();
-        problem.setDetail("The request body is not valid JSON for this operation.");
-        return respond(logInvalidRequest(problem, "unreadable_body"));
+    /** Every invalid request: body fields, headers, a non-UUID orderId, or a body that is not valid JSON. */
+    @ExceptionHandler({
+            MethodArgumentNotValidException.class,
+            ConstraintViolationException.class,
+            MissingRequestHeaderException.class,
+            MethodArgumentTypeMismatchException.class,
+            HttpMessageNotReadableException.class})
+    ResponseEntity<Problem> handleInvalidRequest(Exception ex) {
+        Problem problem = problem(HttpStatus.BAD_REQUEST, "Invalid request", VALIDATION_FAILED);
+        String reason = switch (ex) {
+            case MethodArgumentNotValidException e -> {
+                e.getFieldErrors().forEach(error ->
+                        problem.addViolationsItem(new Violation(error.getField(), error.getDefaultMessage())));
+                yield "invalid_body";
+            }
+            case ConstraintViolationException e -> {
+                e.getConstraintViolations().forEach(violation ->
+                        problem.addViolationsItem(new Violation(headerName(violation), violation.getMessage())));
+                yield "invalid_header";
+            }
+            case MissingRequestHeaderException e -> {
+                problem.addViolationsItem(new Violation(e.getHeaderName(), "must not be null"));
+                yield "missing_header";
+            }
+            case MethodArgumentTypeMismatchException e -> {
+                problem.addViolationsItem(new Violation(e.getName(), "has an invalid format"));
+                yield "invalid_parameter";
+            }
+            default -> {
+                problem.setDetail("The request body is not valid JSON for this operation.");
+                yield "unreadable_body";
+            }
+        };
+        return badRequest(problem, reason);
     }
 
     @ExceptionHandler(DeliveryRejectedException.class)
     ResponseEntity<Problem> handleRejected(DeliveryRejectedException ex) {
         Problem problem = problem(HttpStatus.UNPROCESSABLE_ENTITY, "Delivery is not eligible", ex.getRejectionCode());
         problem.setOrderStatus(OrderStatus.REJECTED);
-        return respond(problem);
+        return respond(problem, new HttpHeaders());
     }
 
     @ExceptionHandler(PricingUnavailableException.class)
@@ -102,47 +93,46 @@ public class ApiExceptionHandler {
         Problem problem = problem(HttpStatus.SERVICE_UNAVAILABLE,
                 "Pricing temporarily unavailable or invalid upstream response", "PRICING_UNAVAILABLE");
         problem.setOrderStatus(OrderStatus.PRICING_UNAVAILABLE);
-        return respondRetryAfter(problem, 5);
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.RETRY_AFTER, "5");
+        return respond(problem, headers);
     }
 
     @ExceptionHandler(IdempotencyConflictException.class)
     ResponseEntity<Problem> handleConflict(IdempotencyConflictException ex) {
         return respond(problem(HttpStatus.CONFLICT,
-                "Idempotency-Key already used for a different request", "IDEMPOTENCY_CONFLICT"));
+                "Idempotency-Key already used for a different request", "IDEMPOTENCY_CONFLICT"), new HttpHeaders());
     }
 
     @ExceptionHandler(OrderNotFoundException.class)
     ResponseEntity<Problem> handleNotFound(OrderNotFoundException ex) {
-        return respond(problem(HttpStatus.NOT_FOUND, "Order not found", "ORDER_NOT_FOUND"));
+        return respond(problem(HttpStatus.NOT_FOUND, "Order not found", "ORDER_NOT_FOUND"), new HttpHeaders());
     }
 
-    /** Wrong method, content type, Accept header or path: keep Spring's status and standard headers (such as Allow). */
-    @ExceptionHandler({
-            HttpRequestMethodNotSupportedException.class,
-            HttpMediaTypeNotSupportedException.class,
-            HttpMediaTypeNotAcceptableException.class,
-            NoResourceFoundException.class})
-    ResponseEntity<Problem> handleUnsupportedRequest(Exception ex) {
-        ErrorResponse errorResponse = (ErrorResponse) ex;
-        HttpStatus httpStatus = HttpStatus.valueOf(errorResponse.getStatusCode().value());
-        Problem problem = problem(httpStatus, httpStatus.getReasonPhrase(), REQUEST_NOT_SUPPORTED);
-        return ResponseEntity.status(httpStatus)
-                .headers(errorResponse.getHeaders())
-                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .body(problem);
-    }
-
+    /**
+     * Spring's own request errors (wrong method, content type, Accept header or path) keep their status and standard
+     * headers, such as Allow. Anything else is a bug: logged, and answered with a generic 500.
+     */
     @ExceptionHandler(Exception.class)
-    ResponseEntity<Problem> handleUnexpected(Exception ex) {
+    ResponseEntity<Problem> handleOther(Exception ex) {
+        if (ex instanceof ErrorResponse springError) {
+            HttpStatus status = HttpStatus.valueOf(springError.getStatusCode().value());
+            return respond(problem(status, status.getReasonPhrase(), REQUEST_NOT_SUPPORTED), springError.getHeaders());
+        }
         log.atError().setMessage("Unexpected error while handling a delivery order request")
                 .addKeyValue("event", "order.failed")
                 .setCause(ex)
                 .log();
-        return respond(problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", INTERNAL_ERROR));
+        return respond(problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", INTERNAL_ERROR), new HttpHeaders());
     }
 
-    private static Problem validationProblem() {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid request", VALIDATION_FAILED);
+    /** Logs one event without request values (the correlation ID comes from the MDC) and returns the 400. */
+    private static ResponseEntity<Problem> badRequest(Problem problem, String reason) {
+        log.atWarn().setMessage("Invalid delivery order request")
+                .addKeyValue("event", "order.request_invalid")
+                .addKeyValue("reason", reason)
+                .log();
+        return respond(problem, new HttpHeaders());
     }
 
     private static Problem problem(HttpStatus status, String title, String code) {
@@ -151,43 +141,19 @@ public class ApiExceptionHandler {
         return problem;
     }
 
-    /** Logs the field names of an invalid request only, never the rejected values. */
-    private static Problem logInvalidRequest(Problem problem, String reason) {
-        List<String> fields = problem.getViolations().stream().map(ProblemViolationsInner::getField).sorted().toList();
-        log.atWarn().setMessage("Invalid delivery order request")
-                .addKeyValue("event", "order.request_invalid")
-                .addKeyValue("reason", reason)
-                .addKeyValue("fields", fields)
-                .log();
-        return problem;
+    private static ResponseEntity<Problem> respond(Problem problem, HttpHeaders headers) {
+        return ResponseEntity.status(problem.getStatus())
+                .headers(headers)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem);
     }
 
-    private static ProblemViolationsInner toViolation(FieldError error) {
-        return new ProblemViolationsInner(error.getField(), error.getDefaultMessage());
-    }
-
-    private static String lastNodeName(ConstraintViolation<?> violation) {
+    /** The last node of the violation's path is the method parameter, for example idempotencyKey. */
+    private static String headerName(ConstraintViolation<?> violation) {
         String name = null;
         for (Path.Node node : violation.getPropertyPath()) {
             name = node.getName();
         }
-        return name;
-    }
-
-    private static String headerName(String parameterName) {
-        return HEADER_NAMES.getOrDefault(parameterName, parameterName);
-    }
-
-    private static ResponseEntity<Problem> respond(Problem problem) {
-        return ResponseEntity.status(problem.getStatus())
-                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .body(problem);
-    }
-
-    private static ResponseEntity<Problem> respondRetryAfter(Problem problem, int seconds) {
-        return ResponseEntity.status(problem.getStatus())
-                .header(HttpHeaders.RETRY_AFTER, String.valueOf(seconds))
-                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .body(problem);
+        return HEADER_NAMES.getOrDefault(name, name);
     }
 }
