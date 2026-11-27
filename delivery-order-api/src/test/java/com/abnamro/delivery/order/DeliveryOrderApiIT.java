@@ -66,14 +66,14 @@ class DeliveryOrderApiIT extends IntegrationTest {
     }
 
     @Test
-    void replaysAnEquivalentRequestWithoutCallingPricingAgain() throws Exception {
+    void returnsTheSameOrderForAnEquivalentRequestWithoutCallingPricingAgain() throws Exception {
         pricingAnswers(eligible("8.95"));
         String first = json(create("key-1", requestJson("1012AB", 2750, "NL"))).get("orderId").asText();
 
-        ResponseEntity<String> replay = create("key-1", requestJson("1012 ab", 2750, "NL"));
+        ResponseEntity<String> repeated = create("key-1", requestJson("1012 ab", 2750, "NL"));
 
-        assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(json(replay).get("orderId").asText()).isEqualTo(first);
+        assertThat(repeated.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(json(repeated).get("orderId").asText()).isEqualTo(first);
         PRICING.verify(1, postRequestedFor(urlEqualTo(PRICING_PATH)));
         assertThat(count("delivery_order")).isEqualTo(1);
     }
@@ -90,16 +90,16 @@ class DeliveryOrderApiIT extends IntegrationTest {
     }
 
     @Test
-    void returnsAndReplaysABusinessRejectionWithoutCreatingAnOrder() throws Exception {
+    void returnsTheSameBusinessRejectionAgainWithoutCreatingAnOrder() throws Exception {
         pricingAnswers(okJson("""
                 {"requestId":"{{jsonPath request.body '$.requestId'}}","eligible":false,
                  "rejectionCode":"WEIGHT_LIMIT_EXCEEDED","message":"Too heavy","evaluatedAt":"2026-11-25T08:30:00Z"}
                 """).withTransformers("response-template"));
 
         ResponseEntity<String> rejected = create("key-1", requestJson("1012AB", 25000, "NL"));
-        ResponseEntity<String> replay = create("key-1", requestJson("1012AB", 25000, "NL"));
+        ResponseEntity<String> repeated = create("key-1", requestJson("1012AB", 25000, "NL"));
 
-        for (ResponseEntity<String> response : List.of(rejected, replay)) {
+        for (ResponseEntity<String> response : List.of(rejected, repeated)) {
             assertProblem(response, HttpStatus.UNPROCESSABLE_ENTITY, "WEIGHT_LIMIT_EXCEEDED");
             assertThat(json(response).get("orderStatus").asText()).isEqualTo("REJECTED");
         }

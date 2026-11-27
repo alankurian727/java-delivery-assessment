@@ -15,8 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Stores and replays the final outcome of each Idempotency-Key (ADR-008). Nothing is written before the outcome is
- * known, so there is no in-progress state to recover. Recording joins the caller's transaction when there is one.
+ * Stores the final outcome of each Idempotency-Key and returns it for repeated requests (ADR-008). Nothing is
+ * written before the outcome is known, so there is no in-progress state to recover. Recording joins the caller's
+ * transaction when there is one.
  */
 @Service
 public class IdempotencyService {
@@ -32,11 +33,11 @@ public class IdempotencyService {
     }
 
     /**
-     * Returns the order ID stored for this key, or empty when the key is new. A stored rejection is replayed by
+     * Returns the order ID stored for this key, or empty when the key is new. A stored rejection is returned by
      * throwing it again; a different request under the same key is a conflict.
      */
     @Transactional(readOnly = true)
-    public Optional<UUID> replayOutcome(String key, String fingerprint) {
+    public Optional<UUID> findPreviousOutcome(String key, String fingerprint) {
         Optional<IdempotencyRecordEntity> existing = recordRepository.findById(key);
         if (existing.isEmpty()) {
             return Optional.empty();
@@ -46,7 +47,7 @@ public class IdempotencyService {
             logEvent("order.idempotency_conflict", null);
             throw new IdempotencyConflictException();
         }
-        logEvent("order.replayed", record.getOutcome());
+        logEvent("order.previous_outcome_returned", record.getOutcome());
         if (record.getOutcome() == IdempotencyOutcome.REJECTED) {
             throw new DeliveryRejectedException(record.getRejectionCode());
         }

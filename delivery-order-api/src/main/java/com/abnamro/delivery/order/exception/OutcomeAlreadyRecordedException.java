@@ -1,6 +1,6 @@
 package com.abnamro.delivery.order.exception;
 
-/** Another request with the same Idempotency-Key recorded its outcome first. Handled internally by a replay. */
+/** Another request with the same Idempotency-Key recorded its outcome first. Handled internally by returning that outcome. */
 public class OutcomeAlreadyRecordedException extends RuntimeException {
 
     public OutcomeAlreadyRecordedException() {

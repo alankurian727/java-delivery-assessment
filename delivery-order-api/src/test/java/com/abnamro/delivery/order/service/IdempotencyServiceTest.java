@@ -33,28 +33,28 @@ class IdempotencyServiceTest {
             new IdempotencyService(recordRepository, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
-    void newKeyHasNothingToReplay() {
+    void newKeyHasNoPreviousOutcome() {
         when(recordRepository.findById(KEY)).thenReturn(Optional.empty());
 
-        assertThat(service.replayOutcome(KEY, FINGERPRINT)).isEmpty();
+        assertThat(service.findPreviousOutcome(KEY, FINGERPRINT)).isEmpty();
     }
 
     @Test
-    void confirmedKeyReplaysItsOrder() {
+    void confirmedKeyReturnsItsOrder() {
         UUID orderId = UUID.randomUUID();
         IdempotencyRecordEntity confirmed = record(FINGERPRINT, IdempotencyOutcome.CONFIRMED, null, orderId);
         when(recordRepository.findById(KEY)).thenReturn(Optional.of(confirmed));
 
-        assertThat(service.replayOutcome(KEY, FINGERPRINT)).contains(orderId);
+        assertThat(service.findPreviousOutcome(KEY, FINGERPRINT)).contains(orderId);
     }
 
     @Test
-    void rejectedKeyReplaysTheRejection() {
+    void rejectedKeyReturnsTheRejection() {
         IdempotencyRecordEntity rejected =
                 record(FINGERPRINT, IdempotencyOutcome.REJECTED, "WEIGHT_LIMIT_EXCEEDED", null);
         when(recordRepository.findById(KEY)).thenReturn(Optional.of(rejected));
 
-        assertThatThrownBy(() -> service.replayOutcome(KEY, FINGERPRINT))
+        assertThatThrownBy(() -> service.findPreviousOutcome(KEY, FINGERPRINT))
                 .isInstanceOf(DeliveryRejectedException.class)
                 .extracting("rejectionCode").isEqualTo("WEIGHT_LIMIT_EXCEEDED");
     }
@@ -65,7 +65,7 @@ class IdempotencyServiceTest {
                 record("other-fingerprint", IdempotencyOutcome.CONFIRMED, null, UUID.randomUUID());
         when(recordRepository.findById(KEY)).thenReturn(Optional.of(otherRequest));
 
-        assertThatThrownBy(() -> service.replayOutcome(KEY, FINGERPRINT))
+        assertThatThrownBy(() -> service.findPreviousOutcome(KEY, FINGERPRINT))
                 .isInstanceOf(IdempotencyConflictException.class);
     }
 

@@ -27,7 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Creates orders following ADR-005: an order is created only when Pricing returns an eligible, valid evaluation.
- * The outcome is recorded once per Idempotency-Key and replayed for repeated requests (ADR-008); when Pricing is
+ * The outcome is recorded once per Idempotency-Key and returned again for repeated requests (ADR-008); when Pricing is
  * unavailable nothing is recorded, so the client can retry with the same key.
  */
 @Service
@@ -56,7 +56,7 @@ public class DeliveryOrderService {
 
     public DeliveryOrder createOrder(String idempotencyKey, OrderRequest request) {
         String fingerprint = computeFingerprint(request);
-        Optional<UUID> existingOrderId = idempotencyService.replayOutcome(idempotencyKey, fingerprint);
+        Optional<UUID> existingOrderId = idempotencyService.findPreviousOutcome(idempotencyKey, fingerprint);
         if (existingOrderId.isPresent()) {
             return retrieveOrder(existingOrderId.get());
         }
@@ -64,7 +64,7 @@ public class DeliveryOrderService {
             return evaluateNewOrder(idempotencyKey, fingerprint, request);
         } catch (OutcomeAlreadyRecordedException e) {
             // A concurrent request with the same key recorded its outcome first: answer with that outcome.
-            return idempotencyService.replayOutcome(idempotencyKey, fingerprint)
+            return idempotencyService.findPreviousOutcome(idempotencyKey, fingerprint)
                     .map(this::retrieveOrder)
                     .orElseThrow(() -> new IllegalStateException("Recorded outcome not found"));
         }
@@ -115,7 +115,7 @@ public class DeliveryOrderService {
     private DeliveryOrder confirmOrder(String idempotencyKey, String fingerprint, OrderRequest request,
                                        PricingDecision pricingDecision) {
         return transactionTemplate.execute(status -> {
-            // PostgreSQL stores microseconds; truncate so a replayed response is identical to the first one.
+            // PostgreSQL stores microseconds; truncate so a repeated request gets the same createdAt as the first.
             Instant createdAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
             DeliveryOrderEntity orderEntity = DeliveryOrderEntity.confirmed(
                     UUID.randomUUID(), request, pricingDecision.price(), pricingDecision.pricingRequestId(), createdAt);

@@ -66,9 +66,9 @@ class DeliveryOrderServiceTest {
     }
 
     @Test
-    void replaysAnExistingOrderWithoutCallingPricing() {
+    void returnsAnExistingOrderWithoutCallingPricing() {
         UUID orderId = UUID.randomUUID();
-        when(idempotencyService.replayOutcome(eq(KEY), anyString())).thenReturn(Optional.of(orderId));
+        when(idempotencyService.findPreviousOutcome(eq(KEY), anyString())).thenReturn(Optional.of(orderId));
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(storedOrder(orderId)));
 
         DeliveryOrder order = service.createOrder(KEY, orderRequest());
@@ -115,7 +115,7 @@ class DeliveryOrderServiceTest {
     @Test
     void answersWithTheWinnersOrderWhenAConcurrentRequestRecordedTheKeyFirst() {
         UUID winnerOrderId = UUID.randomUUID();
-        when(idempotencyService.replayOutcome(eq(KEY), anyString()))
+        when(idempotencyService.findPreviousOutcome(eq(KEY), anyString()))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(winnerOrderId));
         when(pricingClient.evaluate(any(), any())).thenAnswer(call -> PricingDecision.eligible(call.getArgument(0), PRICE));
@@ -141,7 +141,7 @@ class DeliveryOrderServiceTest {
         for (OrderRequest request : new OrderRequest[] {orderRequest(), sameAgain, heavier}) {
             assertThatThrownBy(() -> service.createOrder(KEY, request)).isInstanceOf(PricingUnavailableException.class);
         }
-        verify(idempotencyService, times(3)).replayOutcome(eq(KEY), fingerprints.capture());
+        verify(idempotencyService, times(3)).findPreviousOutcome(eq(KEY), fingerprints.capture());
 
         assertThat(fingerprints.getAllValues().get(0))
                 .hasSize(64)

@@ -17,7 +17,7 @@ CREATE TABLE delivery_order (
     created_at             TIMESTAMPTZ   NOT NULL
 );
 
--- The final outcome of each Idempotency-Key (ADR-008), written once and never updated, so it can be replayed.
+-- The final outcome of each Idempotency-Key (ADR-008), written once and never updated, so repeated requests get the same answer.
 -- The primary key allows one outcome per key across all instances.
 CREATE TABLE idempotency_record (
     idempotency_key     VARCHAR(128) PRIMARY KEY,
