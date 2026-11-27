@@ -30,13 +30,14 @@ public class IdempotencyService {
 
     private static final Logger log = LoggerFactory.getLogger(IdempotencyService.class);
 
-    private final IdempotencyRecordRepository records;
-    private final DeliveryOrderRepository orders;
+    private final IdempotencyRecordRepository recordRepository;
+    private final DeliveryOrderRepository orderRepository;
     private final Clock clock;
 
-    public IdempotencyService(IdempotencyRecordRepository records, DeliveryOrderRepository orders, Clock clock) {
-        this.records = records;
-        this.orders = orders;
+    public IdempotencyService(IdempotencyRecordRepository recordRepository, DeliveryOrderRepository orderRepository,
+                              Clock clock) {
+        this.recordRepository = recordRepository;
+        this.orderRepository = orderRepository;
         this.clock = clock;
     }
 
@@ -45,12 +46,12 @@ public class IdempotencyService {
      * throwing it again; a different request under the same key is a conflict.
      */
     @Transactional(readOnly = true)
-    public Optional<UUID> replay(String key, String fingerprint) {
-        Optional<IdempotencyRecordEntity> found = records.findById(key);
-        if (found.isEmpty()) {
+    public Optional<UUID> replayOutcome(String key, String fingerprint) {
+        Optional<IdempotencyRecordEntity> existing = recordRepository.findById(key);
+        if (existing.isEmpty()) {
             return Optional.empty();
         }
-        IdempotencyRecordEntity record = found.get();
+        IdempotencyRecordEntity record = existing.get();
         if (!record.getRequestFingerprint().equals(fingerprint)) {
             logEvent("order.idempotency_conflict", null);
             throw new IdempotencyConflictException();
@@ -64,7 +65,7 @@ public class IdempotencyService {
 
     @Transactional
     public void recordRejection(String key, String fingerprint, String rejectionCode) {
-        insert(key, fingerprint, IdempotencyOutcome.REJECTED, rejectionCode, null);
+        recordOutcome(key, fingerprint, IdempotencyOutcome.REJECTED, rejectionCode, null);
     }
 
     /**
@@ -72,8 +73,9 @@ public class IdempotencyService {
      * first, the exception rolls the order back, so a key never has more than one order.
      */
     @Transactional
-    public DeliveryOrder confirm(String key, String fingerprint, OrderRequest request, PricingDecision decision) {
-        DeliveryOrderEntity order = orders.saveAndFlush(new DeliveryOrderEntity(
+    public DeliveryOrder confirmOrder(String key, String fingerprint, OrderRequest request,
+                                      PricingDecision pricingDecision) {
+        DeliveryOrderEntity orderEntity = orderRepository.saveAndFlush(new DeliveryOrderEntity(
                 UUID.randomUUID(),
                 request.customerReference(),
                 request.sender().name(),
@@ -84,27 +86,29 @@ public class IdempotencyService {
                 request.recipient().countryCode(),
                 request.weightInGrams(),
                 request.deliveryType(),
-                decision.price().amount(),
-                decision.price().currency(),
-                decision.pricingRequestId(),
+                pricingDecision.price().amount(),
+                pricingDecision.price().currency(),
+                pricingDecision.pricingRequestId(),
                 // PostgreSQL stores microseconds; truncate so a replayed response is identical to the first one.
                 clock.instant().truncatedTo(ChronoUnit.MICROS)));
-        insert(key, fingerprint, IdempotencyOutcome.CONFIRMED, null, order.getId());
-        return order.toDomain();
+        recordOutcome(key, fingerprint, IdempotencyOutcome.CONFIRMED, null, orderEntity.getId());
+        return orderEntity.toDomain();
     }
 
-    private void insert(String key, String fingerprint, IdempotencyOutcome outcome, String rejectionCode,
-                        UUID orderId) {
-        if (records.insertIfAbsent(key, fingerprint, outcome.name(), rejectionCode, orderId, clock.instant()) == 0) {
+    private void recordOutcome(String key, String fingerprint, IdempotencyOutcome outcome, String rejectionCode,
+                               UUID orderId) {
+        int inserted = recordRepository.insertIfAbsent(
+                key, fingerprint, outcome.name(), rejectionCode, orderId, clock.instant());
+        if (inserted == 0) {
             throw new OutcomeAlreadyRecordedException();
         }
     }
 
     private static void logEvent(String event, IdempotencyOutcome outcome) {
-        var builder = log.atInfo().setMessage("Idempotency-Key already used").addKeyValue("event", event);
+        var logEntry = log.atInfo().setMessage("Idempotency-Key already used").addKeyValue("event", event);
         if (outcome != null) {
-            builder = builder.addKeyValue("outcome", outcome);
+            logEntry = logEntry.addKeyValue("outcome", outcome);
         }
-        builder.log();
+        logEntry.log();
     }
 }

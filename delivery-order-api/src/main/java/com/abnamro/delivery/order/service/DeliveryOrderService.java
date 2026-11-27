@@ -32,46 +32,46 @@ public class DeliveryOrderService {
     private static final Logger log = LoggerFactory.getLogger(DeliveryOrderService.class);
     private static final String UNSUPPORTED_COUNTRY = "UNSUPPORTED_COUNTRY";
 
-    private final IdempotencyService idempotency;
+    private final IdempotencyService idempotencyService;
     private final PricingClient pricingClient;
-    private final DeliveryOrderRepository orders;
+    private final DeliveryOrderRepository orderRepository;
     private final ObjectMapper objectMapper;
 
-    public DeliveryOrderService(IdempotencyService idempotency, PricingClient pricingClient,
-                                DeliveryOrderRepository orders, ObjectMapper objectMapper) {
-        this.idempotency = idempotency;
+    public DeliveryOrderService(IdempotencyService idempotencyService, PricingClient pricingClient,
+                                DeliveryOrderRepository orderRepository, ObjectMapper objectMapper) {
+        this.idempotencyService = idempotencyService;
         this.pricingClient = pricingClient;
-        this.orders = orders;
+        this.orderRepository = orderRepository;
         this.objectMapper = objectMapper;
     }
 
-    public DeliveryOrder create(String idempotencyKey, OrderRequest request) {
-        String fingerprint = fingerprint(request);
-        Optional<UUID> existingOrderId = idempotency.replay(idempotencyKey, fingerprint);
+    public DeliveryOrder createOrder(String idempotencyKey, OrderRequest request) {
+        String fingerprint = computeFingerprint(request);
+        Optional<UUID> existingOrderId = idempotencyService.replayOutcome(idempotencyKey, fingerprint);
         if (existingOrderId.isPresent()) {
-            return get(existingOrderId.get());
+            return retrieveOrder(existingOrderId.get());
         }
         try {
-            return evaluate(idempotencyKey, fingerprint, request);
+            return evaluateNewOrder(idempotencyKey, fingerprint, request);
         } catch (OutcomeAlreadyRecordedException e) {
             // A concurrent request with the same key recorded its outcome first: answer with that outcome.
-            return idempotency.replay(idempotencyKey, fingerprint)
-                    .map(this::get)
+            return idempotencyService.replayOutcome(idempotencyKey, fingerprint)
+                    .map(this::retrieveOrder)
                     .orElseThrow(() -> new IllegalStateException("Recorded outcome not found"));
         }
     }
 
-    private DeliveryOrder evaluate(String idempotencyKey, String fingerprint, OrderRequest request) {
+    private DeliveryOrder evaluateNewOrder(String idempotencyKey, String fingerprint, OrderRequest request) {
         if (!request.isWithinNetherlands()) {
-            idempotency.recordRejection(idempotencyKey, fingerprint, UNSUPPORTED_COUNTRY);
-            logRejected(UNSUPPORTED_COUNTRY, null);
+            idempotencyService.recordRejection(idempotencyKey, fingerprint, UNSUPPORTED_COUNTRY);
+            logRejection(UNSUPPORTED_COUNTRY, null);
             throw new DeliveryRejectedException(UNSUPPORTED_COUNTRY);
         }
 
         UUID pricingRequestId = UUID.randomUUID();
-        PricingDecision decision;
+        PricingDecision pricingDecision;
         try {
-            decision = pricingClient.evaluate(pricingRequestId, request);
+            pricingDecision = pricingClient.evaluate(pricingRequestId, request);
         } catch (PricingUnavailableException e) {
             // Nothing was recorded, so a retry with the same key is evaluated as a new request.
             log.atWarn().setMessage("Order not created: Pricing unavailable")
@@ -82,13 +82,13 @@ public class DeliveryOrderService {
             throw e;
         }
 
-        if (!decision.isEligible()) {
-            idempotency.recordRejection(idempotencyKey, fingerprint, decision.rejectionCode());
-            logRejected(decision.rejectionCode(), pricingRequestId);
-            throw new DeliveryRejectedException(decision.rejectionCode());
+        if (!pricingDecision.isEligible()) {
+            idempotencyService.recordRejection(idempotencyKey, fingerprint, pricingDecision.rejectionCode());
+            logRejection(pricingDecision.rejectionCode(), pricingRequestId);
+            throw new DeliveryRejectedException(pricingDecision.rejectionCode());
         }
 
-        DeliveryOrder order = idempotency.confirm(idempotencyKey, fingerprint, request, decision);
+        DeliveryOrder order = idempotencyService.confirmOrder(idempotencyKey, fingerprint, request, pricingDecision);
         log.atInfo().setMessage("Order created")
                 .addKeyValue("event", "order.created")
                 .addKeyValue("orderId", order.id())
@@ -100,29 +100,29 @@ public class DeliveryOrderService {
     }
 
     /** Reads the stored order; the confirmed price never changes, and Pricing is not called. */
-    public DeliveryOrder get(UUID orderId) {
-        return orders.findById(orderId)
+    public DeliveryOrder retrieveOrder(UUID orderId) {
+        return orderRepository.findById(orderId)
                 .map(DeliveryOrderEntity::toDomain)
                 .orElseThrow(OrderNotFoundException::new);
     }
 
     /** SHA-256 of the normalised request, so equivalent requests (for example "1012 ab" and "1012AB") match. */
-    private String fingerprint(OrderRequest request) {
+    private String computeFingerprint(OrderRequest request) {
         try {
-            byte[] json = objectMapper.writeValueAsBytes(request);
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json));
+            byte[] requestJson = objectMapper.writeValueAsBytes(request);
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(requestJson));
         } catch (JsonProcessingException | NoSuchAlgorithmException e) {
             throw new IllegalStateException("Could not fingerprint the request", e);
         }
     }
 
-    private static void logRejected(String rejectionCode, UUID pricingRequestId) {
-        var builder = log.atInfo().setMessage("Order not created: delivery rejected")
+    private static void logRejection(String rejectionCode, UUID pricingRequestId) {
+        var logEntry = log.atInfo().setMessage("Order not created: delivery rejected")
                 .addKeyValue("event", "order.rejected")
                 .addKeyValue("rejectionCode", rejectionCode);
         if (pricingRequestId != null) {
-            builder = builder.addKeyValue("pricingRequestId", pricingRequestId);
+            logEntry = logEntry.addKeyValue("pricingRequestId", pricingRequestId);
         }
-        builder.log();
+        logEntry.log();
     }
 }

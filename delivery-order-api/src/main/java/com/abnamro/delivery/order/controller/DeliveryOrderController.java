@@ -4,6 +4,7 @@ import com.abnamro.delivery.order.api.DeliveryOrdersApi;
 import com.abnamro.delivery.order.api.model.ConfirmedOrder;
 import com.abnamro.delivery.order.api.model.CreateDeliveryOrderRequest;
 import com.abnamro.delivery.order.domain.DeliveryOrder;
+import com.abnamro.delivery.order.domain.OrderRequest;
 import com.abnamro.delivery.order.service.DeliveryOrderService;
 import java.net.URI;
 import java.util.UUID;
@@ -25,13 +26,14 @@ public class DeliveryOrderController implements DeliveryOrdersApi {
     public ResponseEntity<ConfirmedOrder> createDeliveryOrder(String idempotencyKey,
                                                               CreateDeliveryOrderRequest createDeliveryOrderRequest,
                                                               String xCorrelationID) {
-        DeliveryOrder order = deliveryOrderService.create(idempotencyKey, mapper.toOrderRequest(createDeliveryOrderRequest));
+        OrderRequest orderRequest = mapper.toOrderRequest(createDeliveryOrderRequest);
+        DeliveryOrder order = deliveryOrderService.createOrder(idempotencyKey, orderRequest);
         return ResponseEntity.created(URI.create("/api/v1/delivery-orders/" + order.id()))
                 .body(mapper.toConfirmedOrder(order));
     }
 
     @Override
     public ResponseEntity<ConfirmedOrder> getDeliveryOrder(UUID orderId, String xCorrelationID) {
-        return ResponseEntity.ok(mapper.toConfirmedOrder(deliveryOrderService.get(orderId)));
+        return ResponseEntity.ok(mapper.toConfirmedOrder(deliveryOrderService.retrieveOrder(orderId)));
     }
 }
