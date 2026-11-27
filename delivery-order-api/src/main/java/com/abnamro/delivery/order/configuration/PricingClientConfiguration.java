@@ -27,13 +27,15 @@ public class PricingClientConfiguration {
 
     @Bean
     RestClient pricingRestClient(RestClient.Builder builder, PricingClientProperties properties) {
-        HttpClient httpClient = HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(properties.connectTimeout()) // max time to open the connection, per attempt
+                .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(properties.readTimeout());
+        requestFactory.setReadTimeout(properties.readTimeout()); // max wait for the response, per attempt
 
         return builder
-                .baseUrl(properties.baseUrl().toString())
-                .requestFactory(requestFactory)
+                .baseUrl(properties.baseUrl().toString()) // PricingClient adds the evaluations path
+                .requestFactory(requestFactory) // JDK HttpClient with the timeouts above
                 // Forward the caller's correlation ID so both services log the same ID for one order.
                 .requestInterceptor((request, body, execution) -> {
                     String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
@@ -54,12 +56,12 @@ public class PricingClientConfiguration {
     CircuitBreaker pricingCircuitBreaker(PricingClientProperties properties) {
         PricingClientProperties.CircuitBreakerSettings settings = properties.circuitBreaker();
         CircuitBreaker circuitBreaker = CircuitBreaker.of("pricing", CircuitBreakerConfig.custom()
-                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
-                .slidingWindowSize(settings.slidingWindowSize())
-                .minimumNumberOfCalls(settings.minimumNumberOfCalls())
-                .failureRateThreshold(settings.failureRateThreshold())
-                .waitDurationInOpenState(settings.waitDurationInOpenState())
-                .ignoreExceptions(HttpClientErrorException.class)
+                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED) // judge by number of calls
+                .slidingWindowSize(settings.slidingWindowSize()) // how many recent calls are remembered
+                .minimumNumberOfCalls(settings.minimumNumberOfCalls()) // calls needed before it can open
+                .failureRateThreshold(settings.failureRateThreshold()) // % of failed calls that opens it
+                .waitDurationInOpenState(settings.waitDurationInOpenState()) // fail fast this long, then trial calls
+                .ignoreExceptions(HttpClientErrorException.class) // 4xx is our bug, not a Pricing failure
                 .build());
         circuitBreaker.getEventPublisher().onStateTransition(event -> log.atWarn()
                 .setMessage("Pricing circuit breaker changed state")
@@ -77,9 +79,9 @@ public class PricingClientConfiguration {
     @Bean
     Retry pricingRetry(PricingClientProperties properties) {
         Retry retry = Retry.of("pricing", RetryConfig.custom()
-                .maxAttempts(properties.maxAttempts())
-                .intervalFunction(IntervalFunction.ofRandomized(Duration.ofMillis(150), 0.33)) // 100-200 ms
-                .retryOnException(PricingClientConfiguration::isRetryable)
+                .maxAttempts(properties.maxAttempts()) // total attempts, including the first
+                .intervalFunction(IntervalFunction.ofRandomized(Duration.ofMillis(150), 0.33)) // wait 100-200 ms
+                .retryOnException(PricingClientConfiguration::isRetryable) // only failures safe to retry
                 .build());
         retry.getEventPublisher().onRetry(event -> log.atWarn()
                 .setMessage("Retrying Pricing call")
