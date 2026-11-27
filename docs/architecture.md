@@ -183,7 +183,7 @@ erDiagram
         BIGINT weight_in_grams "positive_weight"
         VARCHAR delivery_type "known_delivery_type"
         VARCHAR status "confirmed_status"
-        NUMERIC price_amount "non_negative_price"
+        NUMERIC price_amount "whole_cents_price"
         VARCHAR price_currency
         UUID pricing_request_id
         TIMESTAMPTZ created_at
@@ -192,7 +192,7 @@ erDiagram
         VARCHAR idempotency_key PK
         VARCHAR request_fingerprint
         VARCHAR outcome "CONFIRMED or REJECTED"
-        VARCHAR rejection_code "rejected_has_reason_code"
+        TEXT rejection_code "rejected_has_reason_code"
         UUID order_id FK "confirmed_has_order"
         TIMESTAMPTZ created_at
     }

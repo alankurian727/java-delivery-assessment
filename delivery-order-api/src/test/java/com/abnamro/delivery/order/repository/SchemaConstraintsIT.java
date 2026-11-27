@@ -1,8 +1,10 @@
 package com.abnamro.delivery.order.repository;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.abnamro.delivery.order.IntegrationTest;
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -50,7 +52,26 @@ class SchemaConstraintsIT extends IntegrationTest {
     @Test
     void refusesInvalidOrderValues() {
         assertRefused(() -> jdbc.update(INSERT_ORDER, UUID.randomUUID(), 0, 8.95), "positive_weight");
-        assertRefused(() -> jdbc.update(INSERT_ORDER, UUID.randomUUID(), 2750, -1), "non_negative_price");
+        assertRefused(() -> jdbc.update(INSERT_ORDER, UUID.randomUUID(), 2750, -1), "whole_cents_price");
+        assertRefused(() -> jdbc.update(INSERT_ORDER, UUID.randomUUID(), 2750, new BigDecimal("8.951")),
+                "whole_cents_price");
+        assertRefused(() -> jdbc.update(INSERT_ORDER.replace("?, 'EUR'", "'Infinity', 'EUR'"), UUID.randomUUID(), 2750),
+                "whole_cents_price");
+    }
+
+    @Test
+    void storesLargeAndTrailingZeroAmountsExactly() {
+        UUID large = UUID.randomUUID();
+        UUID trailingZero = UUID.randomUUID();
+        jdbc.update(INSERT_ORDER, large, 2750, new BigDecimal("100000000.00"));
+        jdbc.update(INSERT_ORDER, trailingZero, 2750, new BigDecimal("8.950"));
+
+        assertThat(amountOf(large)).isEqualByComparingTo("100000000.00");
+        assertThat(amountOf(trailingZero)).isEqualByComparingTo("8.95");
+    }
+
+    private BigDecimal amountOf(UUID orderId) {
+        return jdbc.queryForObject("SELECT price_amount FROM delivery_order WHERE id = ?", BigDecimal.class, orderId);
     }
 
     private static void assertRefused(Runnable insert, String constraint) {

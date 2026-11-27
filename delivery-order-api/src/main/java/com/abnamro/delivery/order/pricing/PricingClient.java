@@ -38,9 +38,6 @@ public class PricingClient {
 
     private static final Logger log = LoggerFactory.getLogger(PricingClient.class);
     private static final String EVALUATIONS_PATH = "/api/v1/pricing/evaluations";
-    // Limits of the columns the answer is stored in (V1 migration): anything larger cannot be confirmed.
-    private static final BigDecimal MAX_PRICE = new BigDecimal("99999999.99"); // delivery_order.price_amount
-    private static final int MAX_REJECTION_CODE_LENGTH = 50; // idempotency_record.rejection_code
 
     private final RestClient restClient;
     private final CircuitBreaker circuitBreaker;
@@ -107,7 +104,7 @@ public class PricingClient {
             }
             RejectedEvaluation rejected = objectMapper.treeToValue(response, RejectedEvaluation.class);
             String code = rejected.getRejectionCode();
-            if (code == null || code.isBlank() || code.length() > MAX_REJECTION_CODE_LENGTH) {
+            if (code == null || code.isBlank()) {
                 throw unavailable("invalid_response");
             }
             return PricingDecision.rejected(pricingRequestId, code);
@@ -117,8 +114,7 @@ public class PricingClient {
     }
 
     /**
-     * Accepts only a EUR total that is present, non-negative, has at most two decimals and fits the database column:
-     * the value we store and confirm. The price components are Pricing's breakdown; Delivery Order does not use them.
+     * Accepts only a EUR total that is present, non-negative and in whole cents: the value we store and confirm. The price components are Pricing's breakdown; Delivery Order does not use them.
      */
     private Money validPrice(EligibleEvaluation eligible) {
         var price = eligible.getPrice();   // the generated Pricing model, not the domain Money
@@ -126,8 +122,7 @@ public class PricingClient {
             throw unavailable("invalid_response");
         }
         BigDecimal amount = price.getAmount();
-        if (amount == null || amount.signum() < 0 || amount.stripTrailingZeros().scale() > 2
-                || amount.compareTo(MAX_PRICE) > 0) {
+        if (amount == null || amount.signum() < 0 || amount.stripTrailingZeros().scale() > 2) {
             throw unavailable("invalid_response");
         }
         return new Money(amount.setScale(2), "EUR");

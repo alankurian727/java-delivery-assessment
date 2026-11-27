@@ -145,27 +145,20 @@ class PricingClientIT {
     }
 
     @Test
-    void treatsATotalTooLargeToStoreAsInvalid() {
-        pricing.stubFor(post(PATH).willReturn(okJson(eligible(requestId, "100000000.00"))));
+    void acceptsAnyWholeCentTotalIncludingTrailingZeros() {
+        pricing.stubFor(post(PATH).willReturn(okJson(eligible(requestId, "8.950"))));
 
-        assertUnavailable("invalid_response");
+        assertThat(pricingClient.evaluate(requestId, orderRequest()).price().amount()).isEqualTo("8.95");
     }
 
     @Test
-    void acceptsTheLargestTotalThatCanBeStored() {
-        pricing.stubFor(post(PATH).willReturn(okJson(eligible(requestId, "99999999.99"))));
-
-        assertThat(pricingClient.evaluate(requestId, orderRequest()).price().amount())
-                .isEqualByComparingTo("99999999.99");
-    }
-
-    @Test
-    void treatsARejectionCodeTooLongToStoreAsInvalid() {
+    void keepsANewRejectionCodeAsItIs() {
+        String newCode = "PARCEL_DIMENSIONS_EXCEED_THE_MAXIMUM_SUPPORTED_BY_THE_SORTING_CENTRE";
         pricing.stubFor(post(PATH).willReturn(okJson("""
                 {"requestId":"%s","eligible":false,"rejectionCode":"%s",
-                 "message":"No","evaluatedAt":"2026-11-25T08:30:00Z"}""".formatted(requestId, "X".repeat(51)))));
+                 "message":"No","evaluatedAt":"2026-11-25T08:30:00Z"}""".formatted(requestId, newCode))));
 
-        assertUnavailable("invalid_response");
+        assertThat(pricingClient.evaluate(requestId, orderRequest()).rejectionCode()).isEqualTo(newCode);
     }
 
     @Test

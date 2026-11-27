@@ -11,7 +11,11 @@ CREATE TABLE delivery_order (
     weight_in_grams        BIGINT        NOT NULL CONSTRAINT positive_weight     CHECK (weight_in_grams > 0),
     delivery_type          VARCHAR(20)   NOT NULL CONSTRAINT known_delivery_type CHECK (delivery_type IN ('STANDARD', 'NEXT_DAY', 'SAME_DAY')),
     status                 VARCHAR(20)   NOT NULL CONSTRAINT confirmed_status    CHECK (status = 'CONFIRMED'),
-    price_amount           NUMERIC(10,2) NOT NULL CONSTRAINT non_negative_price  CHECK (price_amount >= 0),
+    -- Unconstrained NUMERIC stores the exact amount (no silent rounding); the check allows only whole cents >= 0
+    -- and excludes the special values Infinity and NaN.
+    price_amount           NUMERIC       NOT NULL CONSTRAINT whole_cents_price   CHECK (price_amount >= 0
+                                                                                    AND price_amount < 'Infinity'::numeric
+                                                                                    AND price_amount = trunc(price_amount, 2)),
     price_currency         VARCHAR(3)    NOT NULL,
     pricing_request_id     UUID          NOT NULL,
     created_at             TIMESTAMPTZ   NOT NULL
@@ -23,7 +27,7 @@ CREATE TABLE idempotency_record (
     idempotency_key     VARCHAR(128) PRIMARY KEY,
     request_fingerprint VARCHAR(64)  NOT NULL,
     outcome             VARCHAR(20)  NOT NULL CONSTRAINT known_outcome CHECK (outcome IN ('CONFIRMED', 'REJECTED')),
-    rejection_code      VARCHAR(50),
+    rejection_code      TEXT,         -- Pricing owns the codes, so new codes are stored as they are
     order_id            UUID         REFERENCES delivery_order (id),
     created_at          TIMESTAMPTZ  NOT NULL,
     CONSTRAINT confirmed_has_order      CHECK ((outcome = 'CONFIRMED') = (order_id IS NOT NULL)),
