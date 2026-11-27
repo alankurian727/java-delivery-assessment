@@ -25,7 +25,7 @@ public interface IdempotencyRecordRepository extends JpaRepository<IdempotencyRe
     int insertIfAbsent(@Param("key") String key, @Param("fingerprint") String fingerprint,
                        @Param("leaseUntil") Instant leaseUntil, @Param("now") Instant now);
 
-    /** Takes over a retryable record; returns 0 when another request changed it first. */
+    /** Takes over a record whose owner stopped (lease expired); returns 0 when another request changed it first. */
     @Modifying
     @Query("""
             UPDATE IdempotencyRecordEntity r
@@ -35,6 +35,15 @@ public interface IdempotencyRecordRepository extends JpaRepository<IdempotencyRe
             """)
     int takeOver(@Param("key") String key, @Param("version") long version,
                  @Param("leaseUntil") Instant leaseUntil, @Param("now") Instant now);
+
+    /** Removes the record so the key can be used again; returns 0 when this request no longer owns the key. */
+    @Modifying
+    @Query("""
+            DELETE FROM IdempotencyRecordEntity r
+             WHERE r.idempotencyKey = :key AND r.version = :version
+               AND r.state = com.abnamro.delivery.order.domain.IdempotencyState.IN_PROGRESS
+            """)
+    int release(@Param("key") String key, @Param("version") long version);
 
     /** Records the final outcome; returns 0 when this request no longer owns the key. */
     @Modifying

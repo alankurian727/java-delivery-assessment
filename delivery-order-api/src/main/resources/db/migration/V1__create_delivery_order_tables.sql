@@ -22,7 +22,7 @@ CREATE TABLE delivery_order (
 CREATE TABLE idempotency_record (
     idempotency_key     VARCHAR(128) PRIMARY KEY,
     request_fingerprint VARCHAR(64)  NOT NULL,
-    state               VARCHAR(30)  NOT NULL CHECK (state IN ('IN_PROGRESS', 'REJECTED', 'PRICING_UNAVAILABLE', 'COMPLETED')),
+    state               VARCHAR(30)  NOT NULL CHECK (state IN ('IN_PROGRESS', 'REJECTED', 'COMPLETED')),
     rejection_code      VARCHAR(50),
     order_id            UUID         REFERENCES delivery_order (id),
     lease_until         TIMESTAMPTZ  NOT NULL,

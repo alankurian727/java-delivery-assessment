@@ -84,11 +84,8 @@ public class IdempotencyService {
                     throw new IdempotencyInProgressException();
                 }
             }
-            case PRICING_UNAVAILABLE -> {
-                // Retryable: fall through and evaluate again with the same key.
-            }
         }
-        // A retry after PRICING_UNAVAILABLE, or a request whose owner stopped (lease expired): take it over.
+        // The request that held the key stopped without finishing (for example a crash): take it over.
         if (records.takeOver(key, record.getVersion(), leaseUntil, now) == 1) {
             return new Claim(record.getVersion() + 1, null);
         }
@@ -100,9 +97,13 @@ public class IdempotencyService {
         finish(key, version, IdempotencyState.REJECTED, rejectionCode, null);
     }
 
+    /**
+     * Frees the key after Pricing gave no usable answer, so a retry with the same key starts as a new request.
+     * Nothing was decided, so there is nothing to replay; if another request already took the key over, this is a no-op.
+     */
     @Transactional
-    public void markPricingUnavailable(String key, long version) {
-        finish(key, version, IdempotencyState.PRICING_UNAVAILABLE, null, null);
+    public void release(String key, long version) {
+        records.release(key, version);
     }
 
     /** Creates the order and completes the record in one transaction, so they can never disagree. */

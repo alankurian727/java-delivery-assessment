@@ -22,7 +22,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Creates orders following ADR-005: an order is created only when Pricing returns an eligible, valid evaluation.
- * Rejected and Pricing-unavailable outcomes are recorded on the idempotency record only.
+ * A rejection is recorded on the idempotency record so it can be replayed; when Pricing is unavailable the key is
+ * released, so the client can retry with the same key.
  */
 @Service
 public class DeliveryOrderService {
@@ -60,7 +61,7 @@ public class DeliveryOrderService {
         try {
             decision = pricingClient.evaluate(pricingRequestId, request);
         } catch (PricingUnavailableException e) {
-            idempotency.markPricingUnavailable(idempotencyKey, claim.version());
+            idempotency.release(idempotencyKey, claim.version());
             log.atWarn().setMessage("Order not created: Pricing unavailable")
                     .addKeyValue("event", "order.pricing_unavailable")
                     .addKeyValue("pricingRequestId", pricingRequestId)
