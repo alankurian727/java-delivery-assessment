@@ -36,7 +36,6 @@ delivery:
     read-timeout: 2s
     # One retry, only when the request never reached Pricing or it answered 502/503/504.
     max-attempts: 2
-    max-concurrent-calls: 50
     circuit-breaker:
       # Open when at least half of the last 20 calls failed (once 10 calls were made); try again after 10 s.
       failure-rate-threshold: 50

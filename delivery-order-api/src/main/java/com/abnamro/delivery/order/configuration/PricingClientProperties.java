@@ -17,7 +17,6 @@ public record PricingClientProperties(
         @NotNull Duration connectTimeout,
         @NotNull Duration readTimeout,
         @Min(1) @Max(3) int maxAttempts,
-        @Min(1) int maxConcurrentCalls,
         @Valid @NotNull CircuitBreakerSettings circuitBreaker) {
 
     /** Opens when failureRateThreshold % of the last slidingWindowSize calls failed (after minimumNumberOfCalls). */

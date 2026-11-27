@@ -1,7 +1,5 @@
 package com.abnamro.delivery.order.configuration;
 
-import io.github.resilience4j.bulkhead.Bulkhead;
-import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.core.IntervalFunction;
@@ -45,15 +43,6 @@ public class PricingClientConfiguration {
                     return execution.execute(request, body);
                 })
                 .build();
-    }
-
-    /** Caps concurrent Pricing calls per instance; when full, requests fail fast instead of queueing (ADR-007). */
-    @Bean
-    Bulkhead pricingBulkhead(PricingClientProperties properties) {
-        return Bulkhead.of("pricing", BulkheadConfig.custom()
-                .maxConcurrentCalls(properties.maxConcurrentCalls())
-                .maxWaitDuration(Duration.ZERO)
-                .build());
     }
 
     /**

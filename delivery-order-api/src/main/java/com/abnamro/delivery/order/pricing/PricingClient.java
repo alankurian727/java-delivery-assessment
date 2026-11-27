@@ -11,8 +11,6 @@ import com.abnamro.delivery.order.pricing.model.RejectedEvaluation;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.resilience4j.bulkhead.Bulkhead;
-import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.retry.Retry;
@@ -32,9 +30,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 /**
- * Calls the Pricing & Eligibility API through a bulkhead, a circuit breaker and a retry (in that order, outermost
- * first). Any answer that cannot be trusted (unreachable, timed out, overloaded, circuit open, server error or
- * invalid body) becomes {@link PricingUnavailableException}, so an order is never confirmed without a valid price.
+ * Calls the Pricing & Eligibility API through a circuit breaker wrapping a retry. Any answer that cannot be trusted
+ * (unreachable, timed out, circuit open, server error or invalid body) becomes {@link PricingUnavailableException},
+ * so an order is never confirmed without a valid price.
  */
 @Component
 public class PricingClient {
@@ -43,15 +41,13 @@ public class PricingClient {
     private static final String EVALUATIONS_PATH = "/api/v1/pricing/evaluations";
 
     private final RestClient restClient;
-    private final Bulkhead bulkhead;
     private final CircuitBreaker circuitBreaker;
     private final Retry retry;
     private final ObjectMapper objectMapper;
 
-    public PricingClient(RestClient pricingRestClient, Bulkhead pricingBulkhead, CircuitBreaker pricingCircuitBreaker,
-                         Retry pricingRetry, ObjectMapper objectMapper) {
+    public PricingClient(RestClient pricingRestClient, CircuitBreaker pricingCircuitBreaker, Retry pricingRetry,
+                         ObjectMapper objectMapper) {
         this.restClient = pricingRestClient;
-        this.bulkhead = pricingBulkhead;
         this.circuitBreaker = pricingCircuitBreaker;
         this.retry = pricingRetry;
         this.objectMapper = objectMapper;
@@ -69,12 +65,9 @@ public class PricingClient {
         Supplier<PricingDecision> call = () -> toDecision(pricingRequestId, post(request));
         call = Retry.decorateSupplier(retry, call);
         call = CircuitBreaker.decorateSupplier(circuitBreaker, call);
-        call = Bulkhead.decorateSupplier(bulkhead, call);
 
         try {
             return call.get();
-        } catch (BulkheadFullException e) {
-            throw unavailable("bulkhead_full");
         } catch (CallNotPermittedException e) {
             throw unavailable("circuit_open");
         } catch (HttpClientErrorException e) {
