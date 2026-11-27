@@ -1,18 +1,12 @@
 package com.abnamro.delivery.order.service;
 
-import com.abnamro.delivery.order.domain.DeliveryOrder;
 import com.abnamro.delivery.order.domain.IdempotencyOutcome;
-import com.abnamro.delivery.order.domain.OrderRequest;
 import com.abnamro.delivery.order.exception.DeliveryRejectedException;
 import com.abnamro.delivery.order.exception.IdempotencyConflictException;
 import com.abnamro.delivery.order.exception.OutcomeAlreadyRecordedException;
-import com.abnamro.delivery.order.pricing.PricingDecision;
-import com.abnamro.delivery.order.repository.DeliveryOrderEntity;
-import com.abnamro.delivery.order.repository.DeliveryOrderRepository;
 import com.abnamro.delivery.order.repository.IdempotencyRecordEntity;
 import com.abnamro.delivery.order.repository.IdempotencyRecordRepository;
 import java.time.Clock;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -22,8 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Stores and replays the final outcome of each Idempotency-Key (ADR-008). Nothing is written before the outcome is
- * known, so there is no in-progress state to recover. Each method is one short transaction; the Pricing call never
- * runs inside one.
+ * known, so there is no in-progress state to recover. Recording joins the caller's transaction when there is one.
  */
 @Service
 public class IdempotencyService {
@@ -31,13 +24,10 @@ public class IdempotencyService {
     private static final Logger log = LoggerFactory.getLogger(IdempotencyService.class);
 
     private final IdempotencyRecordRepository recordRepository;
-    private final DeliveryOrderRepository orderRepository;
     private final Clock clock;
 
-    public IdempotencyService(IdempotencyRecordRepository recordRepository, DeliveryOrderRepository orderRepository,
-                              Clock clock) {
+    public IdempotencyService(IdempotencyRecordRepository recordRepository, Clock clock) {
         this.recordRepository = recordRepository;
-        this.orderRepository = orderRepository;
         this.clock = clock;
     }
 
@@ -68,31 +58,10 @@ public class IdempotencyService {
         recordOutcome(key, fingerprint, IdempotencyOutcome.REJECTED, rejectionCode, null);
     }
 
-    /**
-     * Creates the order and records it under the key in one transaction. If another request recorded this key
-     * first, the exception rolls the order back, so a key never has more than one order.
-     */
+    /** Throws {@link OutcomeAlreadyRecordedException} when another request recorded this key first. */
     @Transactional
-    public DeliveryOrder confirmOrder(String key, String fingerprint, OrderRequest request,
-                                      PricingDecision pricingDecision) {
-        DeliveryOrderEntity orderEntity = orderRepository.saveAndFlush(new DeliveryOrderEntity(
-                UUID.randomUUID(),
-                request.customerReference(),
-                request.sender().name(),
-                request.sender().postalCode().value(),
-                request.sender().countryCode(),
-                request.recipient().name(),
-                request.recipient().postalCode().value(),
-                request.recipient().countryCode(),
-                request.weightInGrams(),
-                request.deliveryType(),
-                pricingDecision.price().amount(),
-                pricingDecision.price().currency(),
-                pricingDecision.pricingRequestId(),
-                // PostgreSQL stores microseconds; truncate so a replayed response is identical to the first one.
-                clock.instant().truncatedTo(ChronoUnit.MICROS)));
-        recordOutcome(key, fingerprint, IdempotencyOutcome.CONFIRMED, null, orderEntity.getId());
-        return orderEntity.toDomain();
+    public void recordConfirmation(String key, String fingerprint, UUID orderId) {
+        recordOutcome(key, fingerprint, IdempotencyOutcome.CONFIRMED, null, orderId);
     }
 
     private void recordOutcome(String key, String fingerprint, IdempotencyOutcome outcome, String rejectionCode,

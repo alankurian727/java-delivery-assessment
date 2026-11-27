@@ -14,12 +14,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Creates orders following ADR-005: an order is created only when Pricing returns an eligible, valid evaluation.
@@ -35,14 +38,19 @@ public class DeliveryOrderService {
     private final IdempotencyService idempotencyService;
     private final PricingClient pricingClient;
     private final DeliveryOrderRepository orderRepository;
+    private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     public DeliveryOrderService(IdempotencyService idempotencyService, PricingClient pricingClient,
-                                DeliveryOrderRepository orderRepository, ObjectMapper objectMapper) {
+                                DeliveryOrderRepository orderRepository, TransactionTemplate transactionTemplate,
+                                ObjectMapper objectMapper, Clock clock) {
         this.idempotencyService = idempotencyService;
         this.pricingClient = pricingClient;
         this.orderRepository = orderRepository;
+        this.transactionTemplate = transactionTemplate;
         this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     public DeliveryOrder createOrder(String idempotencyKey, OrderRequest request) {
@@ -88,7 +96,7 @@ public class DeliveryOrderService {
             throw new DeliveryRejectedException(pricingDecision.rejectionCode());
         }
 
-        DeliveryOrder order = idempotencyService.confirmOrder(idempotencyKey, fingerprint, request, pricingDecision);
+        DeliveryOrder order = confirmOrder(idempotencyKey, fingerprint, request, pricingDecision);
         log.atInfo().setMessage("Order created")
                 .addKeyValue("event", "order.created")
                 .addKeyValue("orderId", order.id())
@@ -97,6 +105,35 @@ public class DeliveryOrderService {
                 .addKeyValue("price", order.price().amount())
                 .log();
         return order;
+    }
+
+    /**
+     * Saves the order and records it under the key in one transaction. If another request recorded this key first,
+     * the exception rolls the order back, so a key never has more than one order (ADR-008).
+     */
+    private DeliveryOrder confirmOrder(String idempotencyKey, String fingerprint, OrderRequest request,
+                                       PricingDecision pricingDecision) {
+        return transactionTemplate.execute(status -> {
+            // Flushed now: the idempotency record references the order by foreign key.
+            DeliveryOrderEntity orderEntity = orderRepository.saveAndFlush(new DeliveryOrderEntity(
+                    UUID.randomUUID(),
+                    request.customerReference(),
+                    request.sender().name(),
+                    request.sender().postalCode().value(),
+                    request.sender().countryCode(),
+                    request.recipient().name(),
+                    request.recipient().postalCode().value(),
+                    request.recipient().countryCode(),
+                    request.weightInGrams(),
+                    request.deliveryType(),
+                    pricingDecision.price().amount(),
+                    pricingDecision.price().currency(),
+                    pricingDecision.pricingRequestId(),
+                    // PostgreSQL stores microseconds; truncate so a replayed response is identical to the first one.
+                    clock.instant().truncatedTo(ChronoUnit.MICROS)));
+            idempotencyService.recordConfirmation(idempotencyKey, fingerprint, orderEntity.getId());
+            return orderEntity.toDomain();
+        });
     }
 
     /** Reads the stored order; the confirmed price never changes, and Pricing is not called. */
