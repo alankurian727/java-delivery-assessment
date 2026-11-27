@@ -1,6 +1,8 @@
 package com.abnamro.delivery.order.repository;
 
+import com.abnamro.delivery.order.domain.DeliveryOrder;
 import com.abnamro.delivery.order.domain.DeliveryType;
+import com.abnamro.delivery.order.domain.Money;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -86,27 +88,11 @@ public class DeliveryOrderEntity {
         this.createdAt = createdAt;
     }
 
+    public DeliveryOrder toDomain() {
+        return new DeliveryOrder(id, customerReference, new Money(priceAmount, priceCurrency), createdAt);
+    }
+
     public UUID getId() {
         return id;
-    }
-
-    public String getCustomerReference() {
-        return customerReference;
-    }
-
-    public BigDecimal getPriceAmount() {
-        return priceAmount;
-    }
-
-    public String getPriceCurrency() {
-        return priceCurrency;
-    }
-
-    public UUID getPricingRequestId() {
-        return pricingRequestId;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 }
