@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.Optional;
@@ -114,23 +115,12 @@ public class DeliveryOrderService {
     private DeliveryOrder confirmOrder(String idempotencyKey, String fingerprint, OrderRequest request,
                                        PricingDecision pricingDecision) {
         return transactionTemplate.execute(status -> {
+            // PostgreSQL stores microseconds; truncate so a replayed response is identical to the first one.
+            Instant createdAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
+            DeliveryOrderEntity orderEntity = DeliveryOrderEntity.confirmed(
+                    UUID.randomUUID(), request, pricingDecision.price(), pricingDecision.pricingRequestId(), createdAt);
             // Flushed now: the idempotency record references the order by foreign key.
-            DeliveryOrderEntity orderEntity = orderRepository.saveAndFlush(new DeliveryOrderEntity(
-                    UUID.randomUUID(),
-                    request.customerReference(),
-                    request.sender().name(),
-                    request.sender().postalCode().value(),
-                    request.sender().countryCode(),
-                    request.recipient().name(),
-                    request.recipient().postalCode().value(),
-                    request.recipient().countryCode(),
-                    request.weightInGrams(),
-                    request.deliveryType(),
-                    pricingDecision.price().amount(),
-                    pricingDecision.price().currency(),
-                    pricingDecision.pricingRequestId(),
-                    // PostgreSQL stores microseconds; truncate so a replayed response is identical to the first one.
-                    clock.instant().truncatedTo(ChronoUnit.MICROS)));
+            orderRepository.saveAndFlush(orderEntity);
             idempotencyService.recordConfirmation(idempotencyKey, fingerprint, orderEntity.getId());
             return orderEntity.toDomain();
         });

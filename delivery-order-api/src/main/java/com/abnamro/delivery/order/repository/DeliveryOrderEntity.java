@@ -3,6 +3,7 @@ package com.abnamro.delivery.order.repository;
 import com.abnamro.delivery.order.domain.DeliveryOrder;
 import com.abnamro.delivery.order.domain.DeliveryType;
 import com.abnamro.delivery.order.domain.Money;
+import com.abnamro.delivery.order.domain.OrderRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -67,25 +68,26 @@ public class DeliveryOrderEntity {
         // for JPA
     }
 
-    public DeliveryOrderEntity(UUID id, String customerReference, String senderName, String senderPostalCode,
-                               String senderCountryCode, String recipientName, String recipientPostalCode,
-                               String recipientCountryCode, long weightInGrams, DeliveryType deliveryType,
-                               BigDecimal priceAmount, String priceCurrency, UUID pricingRequestId, Instant createdAt) {
-        this.id = id;
-        this.customerReference = customerReference;
-        this.senderName = senderName;
-        this.senderPostalCode = senderPostalCode;
-        this.senderCountryCode = senderCountryCode;
-        this.recipientName = recipientName;
-        this.recipientPostalCode = recipientPostalCode;
-        this.recipientCountryCode = recipientCountryCode;
-        this.weightInGrams = weightInGrams;
-        this.deliveryType = deliveryType;
-        this.status = "CONFIRMED";
-        this.priceAmount = priceAmount;
-        this.priceCurrency = priceCurrency;
-        this.pricingRequestId = pricingRequestId;
-        this.createdAt = createdAt;
+    /** A confirmed order: the normalised request and the price Pricing confirmed for it. */
+    public static DeliveryOrderEntity confirmed(UUID id, OrderRequest request, Money price, UUID pricingRequestId,
+                                                Instant createdAt) {
+        DeliveryOrderEntity order = new DeliveryOrderEntity();
+        order.id = id;
+        order.customerReference = request.customerReference();
+        order.senderName = request.sender().name();
+        order.senderPostalCode = request.sender().postalCode().value();
+        order.senderCountryCode = request.sender().countryCode();
+        order.recipientName = request.recipient().name();
+        order.recipientPostalCode = request.recipient().postalCode().value();
+        order.recipientCountryCode = request.recipient().countryCode();
+        order.weightInGrams = request.weightInGrams();
+        order.deliveryType = request.deliveryType();
+        order.status = "CONFIRMED";
+        order.priceAmount = price.amount();
+        order.priceCurrency = price.currency();
+        order.pricingRequestId = pricingRequestId;
+        order.createdAt = createdAt;
+        return order;
     }
 
     // Mapped here because it is a few fields; the entity may depend on the domain, never the reverse.

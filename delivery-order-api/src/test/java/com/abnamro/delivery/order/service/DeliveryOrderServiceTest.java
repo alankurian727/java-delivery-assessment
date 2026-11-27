@@ -158,8 +158,6 @@ class DeliveryOrderServiceTest {
     }
 
     private static DeliveryOrderEntity storedOrder(UUID orderId) {
-        return new DeliveryOrderEntity(orderId, "CUSTOMER-TEST-001", "Test Sender", "1012AB", "NL",
-                "Test Recipient", "5611EM", "NL", 2750, DeliveryType.NEXT_DAY,
-                PRICE.amount(), "EUR", UUID.randomUUID(), NOW);
+        return DeliveryOrderEntity.confirmed(orderId, orderRequest(), PRICE, UUID.randomUUID(), NOW);
     }
 }
