@@ -173,6 +173,24 @@ class DeliveryOrderApiIT extends IntegrationTest {
     }
 
     @Test
+    void namesTheInvalidHeaderInTheViolations() throws Exception {
+        ResponseEntity<String> invalidKey = create("my key", requestJson());
+
+        HttpHeaders headers = jsonHeaders();
+        headers.set("Idempotency-Key", "key-1");
+        headers.set("X-Correlation-ID", "x".repeat(129));
+        ResponseEntity<String> invalidCorrelationId =
+                restTemplate.postForEntity(ORDERS, new HttpEntity<>(requestJson(), headers), String.class);
+
+        assertProblem(invalidKey, HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
+        assertThat(json(invalidKey).get("violations").get(0).get("field").asText()).isEqualTo("Idempotency-Key");
+        assertProblem(invalidCorrelationId, HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
+        assertThat(json(invalidCorrelationId).get("violations").get(0).get("field").asText())
+                .isEqualTo("X-Correlation-ID");
+        PRICING.verify(0, postRequestedFor(urlEqualTo(PRICING_PATH)));
+    }
+
+    @Test
     void rejectsABodyThatIsNotValidJson() throws Exception {
         assertProblem(create("key-1", "{not json"), HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
     }
