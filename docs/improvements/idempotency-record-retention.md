@@ -62,12 +62,3 @@ fast because they always use the primary key.
 - After deletion, the same key with the same request is treated as new and evaluated again. With the original record
   gone, a retry after the retention period can therefore create a second order. The retention period must be longer
   than any client's retry window.
-
-## Related
-
-- **Orders** are business data and follow the GDPR retention rules (README), not this period. Deleting or anonymising
-  an order must happen after its idempotency record is deleted, because the foreign key prevents deleting an order
-  that a record still references.
-- **Rejections are final for their key** during the retention period: the same request with the same key returns the
-  same 422. A corrected or retried order uses a new key.
-- See ADR-008 (record the outcome once) and ADR-009 (race conditions).
