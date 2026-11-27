@@ -5,7 +5,6 @@ import com.abnamro.delivery.order.domain.OrderRequest;
 import com.abnamro.delivery.order.exception.PricingUnavailableException;
 import com.abnamro.delivery.order.pricing.model.DeliveryType;
 import com.abnamro.delivery.order.pricing.model.EligibleEvaluation;
-import com.abnamro.delivery.order.pricing.model.PriceComponent;
 import com.abnamro.delivery.order.pricing.model.PricingEvaluationRequest;
 import com.abnamro.delivery.order.pricing.model.RejectedEvaluation;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -114,32 +113,19 @@ public class PricingClient {
     }
 
     /**
-     * Accepts only a EUR price that equals the sum of its components. The total and every component amount must be
-     * present, non-negative and have at most two decimals.
+     * Accepts only a EUR total that is present, non-negative and has at most two decimals: the value we store and
+     * confirm. The price components are Pricing's breakdown; Delivery Order does not use them.
      */
     private Money validPrice(EligibleEvaluation eligible) {
-        if (eligible.getPrice() == null || eligible.getPrice().getCurrency() == null
-                || !"EUR".equals(eligible.getPrice().getCurrency().getValue())
-                || !isValidAmount(eligible.getPrice().getAmount())
-                || eligible.getPriceComponents() == null || eligible.getPriceComponents().isEmpty()) {
+        var price = eligible.getPrice();   // the generated Pricing model, not the domain Money
+        if (price == null || price.getCurrency() == null || !"EUR".equals(price.getCurrency().getValue())) {
             throw unavailable("invalid_response");
         }
-        BigDecimal componentSum = BigDecimal.ZERO;
-        for (PriceComponent component : eligible.getPriceComponents()) {
-            if (component == null || !isValidAmount(component.getAmount())) {
-                throw unavailable("invalid_response");
-            }
-            componentSum = componentSum.add(component.getAmount());
-        }
-        BigDecimal total = eligible.getPrice().getAmount();
-        if (total.compareTo(componentSum) != 0) {
+        BigDecimal amount = price.getAmount();
+        if (amount == null || amount.signum() < 0 || amount.stripTrailingZeros().scale() > 2) {
             throw unavailable("invalid_response");
         }
-        return new Money(total.setScale(2), "EUR");
-    }
-
-    private static boolean isValidAmount(BigDecimal amount) {
-        return amount != null && amount.signum() >= 0 && amount.stripTrailingZeros().scale() <= 2;
+        return new Money(amount.setScale(2), "EUR");
     }
 
     private static PricingUnavailableException unavailable(String reason) {
