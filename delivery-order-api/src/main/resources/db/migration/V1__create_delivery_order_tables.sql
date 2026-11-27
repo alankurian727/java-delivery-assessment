@@ -8,10 +8,10 @@ CREATE TABLE delivery_order (
     recipient_name         VARCHAR(200)  NOT NULL,
     recipient_postal_code  VARCHAR(6)    NOT NULL,
     recipient_country_code VARCHAR(2)    NOT NULL,
-    weight_in_grams        BIGINT        NOT NULL CHECK (weight_in_grams > 0),
-    delivery_type          VARCHAR(20)   NOT NULL CHECK (delivery_type IN ('STANDARD', 'NEXT_DAY', 'SAME_DAY')),
-    status                 VARCHAR(20)   NOT NULL CHECK (status = 'CONFIRMED'),
-    price_amount           NUMERIC(10,2) NOT NULL CHECK (price_amount >= 0),
+    weight_in_grams        BIGINT        NOT NULL CONSTRAINT positive_weight     CHECK (weight_in_grams > 0),
+    delivery_type          VARCHAR(20)   NOT NULL CONSTRAINT known_delivery_type CHECK (delivery_type IN ('STANDARD', 'NEXT_DAY', 'SAME_DAY')),
+    status                 VARCHAR(20)   NOT NULL CONSTRAINT confirmed_status    CHECK (status = 'CONFIRMED'),
+    price_amount           NUMERIC(10,2) NOT NULL CONSTRAINT non_negative_price  CHECK (price_amount >= 0),
     price_currency         VARCHAR(3)    NOT NULL,
     pricing_request_id     UUID          NOT NULL,
     created_at             TIMESTAMPTZ   NOT NULL
@@ -22,7 +22,7 @@ CREATE TABLE delivery_order (
 CREATE TABLE idempotency_record (
     idempotency_key     VARCHAR(128) PRIMARY KEY,
     request_fingerprint VARCHAR(64)  NOT NULL,
-    outcome             VARCHAR(20)  NOT NULL CHECK (outcome IN ('CONFIRMED', 'REJECTED')),
+    outcome             VARCHAR(20)  NOT NULL CONSTRAINT known_outcome CHECK (outcome IN ('CONFIRMED', 'REJECTED')),
     rejection_code      VARCHAR(50),
     order_id            UUID         REFERENCES delivery_order (id),
     created_at          TIMESTAMPTZ  NOT NULL,
