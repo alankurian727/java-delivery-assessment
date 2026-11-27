@@ -84,20 +84,14 @@ paths:
                 status: 400
                 code: VALIDATION_FAILED
         '409':
-          description: Key already used for different input or matching request still in progress.
-          headers:
-            Retry-After:
-              description: Present only for IDEMPOTENCY_IN_PROGRESS. Suggested number of seconds to wait before retrying with the same idempotency key.
-              schema:
-                type: integer
-                minimum: 1
+          description: Key already used for different input.
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
               example:
                 type: about:blank
-                title: Idempotency conflict or matching request in progress
+                title: Idempotency-Key already used for a different request
                 status: 409
                 code: IDEMPOTENCY_CONFLICT
         '422':
@@ -347,7 +341,7 @@ components:
         code:
           type: string
           description: 'Machine-readable code identifying the error. Known values: VALIDATION_FAILED,
-            IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS, UNSUPPORTED_COUNTRY, WEIGHT_LIMIT_EXCEEDED,
+            IDEMPOTENCY_CONFLICT, UNSUPPORTED_COUNTRY, WEIGHT_LIMIT_EXCEEDED,
             SAME_DAY_NOT_SUPPORTED, ORDER_NOT_FOUND, PRICING_UNAVAILABLE, REQUEST_NOT_SUPPORTED, INTERNAL_ERROR.
             Clients must tolerate new values.'
           example: VALIDATION_FAILED

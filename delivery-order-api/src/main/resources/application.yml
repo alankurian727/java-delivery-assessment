@@ -42,9 +42,6 @@ delivery:
       sliding-window-size: 20
       minimum-number-of-calls: 10
       wait-duration-in-open-state: 10s
-  idempotency:
-    # Longer than a full Pricing call including the retry, so a working request never loses its key.
-    lease: 30s
 
 springdoc:
   swagger-ui:

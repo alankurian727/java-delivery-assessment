@@ -4,6 +4,7 @@ import com.abnamro.delivery.order.domain.DeliveryOrder;
 import com.abnamro.delivery.order.domain.OrderRequest;
 import com.abnamro.delivery.order.exception.DeliveryRejectedException;
 import com.abnamro.delivery.order.exception.OrderNotFoundException;
+import com.abnamro.delivery.order.exception.OutcomeAlreadyRecordedException;
 import com.abnamro.delivery.order.exception.PricingUnavailableException;
 import com.abnamro.delivery.order.pricing.PricingClient;
 import com.abnamro.delivery.order.pricing.PricingDecision;
@@ -11,10 +12,10 @@ import com.abnamro.delivery.order.repository.DeliveryOrderEntity;
 import com.abnamro.delivery.order.repository.DeliveryOrderRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +23,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Creates orders following ADR-005: an order is created only when Pricing returns an eligible, valid evaluation.
- * A rejection is recorded on the idempotency record so it can be replayed; when Pricing is unavailable the key is
- * released, so the client can retry with the same key.
+ * The outcome is recorded once per Idempotency-Key and replayed for repeated requests (ADR-008); when Pricing is
+ * unavailable nothing is recorded, so the client can retry with the same key.
  */
 @Service
 public class DeliveryOrderService {
@@ -45,13 +46,24 @@ public class DeliveryOrderService {
     }
 
     public DeliveryOrder create(String idempotencyKey, OrderRequest request) {
-        IdempotencyService.Claim claim = idempotency.claim(idempotencyKey, fingerprint(request));
-        if (claim.isCompleted()) {
-            return get(claim.completedOrderId());
+        String fingerprint = fingerprint(request);
+        Optional<UUID> existingOrderId = idempotency.replay(idempotencyKey, fingerprint);
+        if (existingOrderId.isPresent()) {
+            return get(existingOrderId.get());
         }
+        try {
+            return evaluate(idempotencyKey, fingerprint, request);
+        } catch (OutcomeAlreadyRecordedException e) {
+            // A concurrent request with the same key recorded its outcome first: answer with that outcome.
+            return idempotency.replay(idempotencyKey, fingerprint)
+                    .map(this::get)
+                    .orElseThrow(() -> new IllegalStateException("Recorded outcome not found"));
+        }
+    }
 
+    private DeliveryOrder evaluate(String idempotencyKey, String fingerprint, OrderRequest request) {
         if (!request.isWithinNetherlands()) {
-            idempotency.reject(idempotencyKey, claim.version(), UNSUPPORTED_COUNTRY);
+            idempotency.recordRejection(idempotencyKey, fingerprint, UNSUPPORTED_COUNTRY);
             logRejected(UNSUPPORTED_COUNTRY, null);
             throw new DeliveryRejectedException(UNSUPPORTED_COUNTRY);
         }
@@ -61,7 +73,7 @@ public class DeliveryOrderService {
         try {
             decision = pricingClient.evaluate(pricingRequestId, request);
         } catch (PricingUnavailableException e) {
-            idempotency.release(idempotencyKey, claim.version());
+            // Nothing was recorded, so a retry with the same key is evaluated as a new request.
             log.atWarn().setMessage("Order not created: Pricing unavailable")
                     .addKeyValue("event", "order.pricing_unavailable")
                     .addKeyValue("pricingRequestId", pricingRequestId)
@@ -71,12 +83,12 @@ public class DeliveryOrderService {
         }
 
         if (!decision.isEligible()) {
-            idempotency.reject(idempotencyKey, claim.version(), decision.rejectionCode());
+            idempotency.recordRejection(idempotencyKey, fingerprint, decision.rejectionCode());
             logRejected(decision.rejectionCode(), pricingRequestId);
             throw new DeliveryRejectedException(decision.rejectionCode());
         }
 
-        DeliveryOrder order = idempotency.confirm(idempotencyKey, claim.version(), request, decision);
+        DeliveryOrder order = idempotency.confirm(idempotencyKey, fingerprint, request, decision);
         log.atInfo().setMessage("Order created")
                 .addKeyValue("event", "order.created")
                 .addKeyValue("orderId", order.id())

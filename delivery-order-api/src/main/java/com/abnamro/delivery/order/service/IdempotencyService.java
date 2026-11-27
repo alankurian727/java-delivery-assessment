@@ -1,20 +1,19 @@
 package com.abnamro.delivery.order.service;
 
-import com.abnamro.delivery.order.configuration.IdempotencyProperties;
 import com.abnamro.delivery.order.domain.DeliveryOrder;
-import com.abnamro.delivery.order.domain.IdempotencyState;
+import com.abnamro.delivery.order.domain.IdempotencyOutcome;
 import com.abnamro.delivery.order.domain.OrderRequest;
 import com.abnamro.delivery.order.exception.DeliveryRejectedException;
 import com.abnamro.delivery.order.exception.IdempotencyConflictException;
-import com.abnamro.delivery.order.exception.IdempotencyInProgressException;
+import com.abnamro.delivery.order.exception.OutcomeAlreadyRecordedException;
 import com.abnamro.delivery.order.pricing.PricingDecision;
 import com.abnamro.delivery.order.repository.DeliveryOrderEntity;
 import com.abnamro.delivery.order.repository.DeliveryOrderRepository;
 import com.abnamro.delivery.order.repository.IdempotencyRecordEntity;
 import com.abnamro.delivery.order.repository.IdempotencyRecordRepository;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns the idempotency record of each request. Every method is one short transaction; the Pricing call happens
- * between them, never inside one. Ownership of a key is decided by the database: the primary key on insert and the
- * version on every update, so it holds across concurrent requests and multiple instances.
+ * Stores and replays the final outcome of each Idempotency-Key (ADR-008). Nothing is written before the outcome is
+ * known, so there is no in-progress state to recover. Each method is one short transaction; the Pricing call never
+ * runs inside one.
  */
 @Service
 public class IdempotencyService {
@@ -33,82 +32,47 @@ public class IdempotencyService {
 
     private final IdempotencyRecordRepository records;
     private final DeliveryOrderRepository orders;
-    private final IdempotencyProperties properties;
     private final Clock clock;
 
-    public IdempotencyService(IdempotencyRecordRepository records, DeliveryOrderRepository orders,
-                              IdempotencyProperties properties, Clock clock) {
+    public IdempotencyService(IdempotencyRecordRepository records, DeliveryOrderRepository orders, Clock clock) {
         this.records = records;
         this.orders = orders;
-        this.properties = properties;
         this.clock = clock;
     }
 
-    /** The outcome of claiming a key: either this request owns it (at a version) or it already has an order. */
-    public record Claim(long version, UUID completedOrderId) {
-
-        public boolean isCompleted() {
-            return completedOrderId != null;
-        }
-    }
-
     /**
-     * Claims the key for this request, or replays the stored outcome of an earlier request with the same key.
-     * Rejected outcomes are replayed by throwing the same rejection again.
+     * Returns the order ID stored for this key, or empty when the key is new. A stored rejection is replayed by
+     * throwing it again; a different request under the same key is a conflict.
      */
-    @Transactional
-    public Claim claim(String key, String fingerprint) {
-        Instant now = clock.instant();
-        Instant leaseUntil = now.plus(properties.lease());
-        if (records.insertIfAbsent(key, fingerprint, leaseUntil, now) == 1) {
-            return new Claim(0, null);
+    @Transactional(readOnly = true)
+    public Optional<UUID> replay(String key, String fingerprint) {
+        Optional<IdempotencyRecordEntity> found = records.findById(key);
+        if (found.isEmpty()) {
+            return Optional.empty();
         }
-
-        IdempotencyRecordEntity record = records.findById(key).orElseThrow();
+        IdempotencyRecordEntity record = found.get();
         if (!record.getRequestFingerprint().equals(fingerprint)) {
             logEvent("order.idempotency_conflict", null);
             throw new IdempotencyConflictException();
         }
-        switch (record.getState()) {
-            case COMPLETED -> {
-                logEvent("order.replayed", "CONFIRMED");
-                return new Claim(record.getVersion(), record.getOrderId());
-            }
-            case REJECTED -> {
-                logEvent("order.replayed", "REJECTED");
-                throw new DeliveryRejectedException(record.getRejectionCode());
-            }
-            case IN_PROGRESS -> {
-                if (record.getLeaseUntil().isAfter(now)) {
-                    logEvent("order.idempotency_in_progress", null);
-                    throw new IdempotencyInProgressException();
-                }
-            }
+        logEvent("order.replayed", record.getOutcome());
+        if (record.getOutcome() == IdempotencyOutcome.REJECTED) {
+            throw new DeliveryRejectedException(record.getRejectionCode());
         }
-        // The request that held the key stopped without finishing (for example a crash): take it over.
-        if (records.takeOver(key, record.getVersion(), leaseUntil, now) == 1) {
-            return new Claim(record.getVersion() + 1, null);
-        }
-        throw new IdempotencyInProgressException();
+        return Optional.of(record.getOrderId());
     }
 
     @Transactional
-    public void reject(String key, long version, String rejectionCode) {
-        finish(key, version, IdempotencyState.REJECTED, rejectionCode, null);
+    public void recordRejection(String key, String fingerprint, String rejectionCode) {
+        insert(key, fingerprint, IdempotencyOutcome.REJECTED, rejectionCode, null);
     }
 
     /**
-     * Frees the key after Pricing gave no usable answer, so a retry with the same key starts as a new request.
-     * Nothing was decided, so there is nothing to replay; if another request already took the key over, this is a no-op.
+     * Creates the order and records it under the key in one transaction. If another request recorded this key
+     * first, the exception rolls the order back, so a key never has more than one order.
      */
     @Transactional
-    public void release(String key, long version) {
-        records.release(key, version);
-    }
-
-    /** Creates the order and completes the record in one transaction, so they can never disagree. */
-    @Transactional
-    public DeliveryOrder confirm(String key, long version, OrderRequest request, PricingDecision decision) {
+    public DeliveryOrder confirm(String key, String fingerprint, OrderRequest request, PricingDecision decision) {
         DeliveryOrderEntity order = orders.saveAndFlush(new DeliveryOrderEntity(
                 UUID.randomUUID(),
                 request.customerReference(),
@@ -125,18 +89,18 @@ public class IdempotencyService {
                 decision.pricingRequestId(),
                 // PostgreSQL stores microseconds; truncate so a replayed response is identical to the first one.
                 clock.instant().truncatedTo(ChronoUnit.MICROS)));
-        // If another request took the key over meanwhile, this throws and the order insert is rolled back.
-        finish(key, version, IdempotencyState.COMPLETED, null, order.getId());
+        insert(key, fingerprint, IdempotencyOutcome.CONFIRMED, null, order.getId());
         return order.toDomain();
     }
 
-    private void finish(String key, long version, IdempotencyState state, String rejectionCode, UUID orderId) {
-        if (records.finish(key, version, state, rejectionCode, orderId, clock.instant()) == 0) {
-            throw new IdempotencyInProgressException();
+    private void insert(String key, String fingerprint, IdempotencyOutcome outcome, String rejectionCode,
+                        UUID orderId) {
+        if (records.insertIfAbsent(key, fingerprint, outcome.name(), rejectionCode, orderId, clock.instant()) == 0) {
+            throw new OutcomeAlreadyRecordedException();
         }
     }
 
-    private static void logEvent(String event, String outcome) {
+    private static void logEvent(String event, IdempotencyOutcome outcome) {
         var builder = log.atInfo().setMessage("Idempotency-Key already used").addKeyValue("event", event);
         if (outcome != null) {
             builder = builder.addKeyValue("outcome", outcome);

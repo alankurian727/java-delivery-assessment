@@ -1,6 +1,6 @@
 package com.abnamro.delivery.order.repository;
 
-import com.abnamro.delivery.order.domain.IdempotencyState;
+import com.abnamro.delivery.order.domain.IdempotencyOutcome;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,7 +10,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Read model of an idempotency record. Writes go through the conditional queries in the repository. */
+/** Read model of an idempotency record. It is written once, by the insert in the repository. */
 @Entity
 @Table(name = "idempotency_record")
 public class IdempotencyRecordEntity {
@@ -23,23 +23,14 @@ public class IdempotencyRecordEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private IdempotencyState state;
+    private IdempotencyOutcome outcome;
 
     private String rejectionCode;
 
     private UUID orderId;
 
     @Column(nullable = false)
-    private Instant leaseUntil;
-
-    @Column(nullable = false)
-    private long version;
-
-    @Column(nullable = false)
     private Instant createdAt;
-
-    @Column(nullable = false)
-    private Instant updatedAt;
 
     protected IdempotencyRecordEntity() {
         // for JPA
@@ -49,8 +40,8 @@ public class IdempotencyRecordEntity {
         return requestFingerprint;
     }
 
-    public IdempotencyState getState() {
-        return state;
+    public IdempotencyOutcome getOutcome() {
+        return outcome;
     }
 
     public String getRejectionCode() {
@@ -59,13 +50,5 @@ public class IdempotencyRecordEntity {
 
     public UUID getOrderId() {
         return orderId;
-    }
-
-    public Instant getLeaseUntil() {
-        return leaseUntil;
-    }
-
-    public long getVersion() {
-        return version;
     }
 }

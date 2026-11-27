@@ -17,18 +17,15 @@ CREATE TABLE delivery_order (
     created_at             TIMESTAMPTZ   NOT NULL
 );
 
--- One row per Idempotency-Key. Not an order: it tracks every accepted request so it can be replayed or retried.
--- The primary key guarantees a single owner per key across all instances.
+-- The final outcome of each Idempotency-Key (ADR-008), written once and never updated, so it can be replayed.
+-- The primary key allows one outcome per key across all instances.
 CREATE TABLE idempotency_record (
     idempotency_key     VARCHAR(128) PRIMARY KEY,
     request_fingerprint VARCHAR(64)  NOT NULL,
-    state               VARCHAR(30)  NOT NULL CHECK (state IN ('IN_PROGRESS', 'REJECTED', 'COMPLETED')),
+    outcome             VARCHAR(20)  NOT NULL CHECK (outcome IN ('CONFIRMED', 'REJECTED')),
     rejection_code      VARCHAR(50),
     order_id            UUID         REFERENCES delivery_order (id),
-    lease_until         TIMESTAMPTZ  NOT NULL,
-    version             BIGINT       NOT NULL,
     created_at          TIMESTAMPTZ  NOT NULL,
-    updated_at          TIMESTAMPTZ  NOT NULL,
-    CHECK ((state = 'COMPLETED') = (order_id IS NOT NULL)),
-    CHECK ((state = 'REJECTED') = (rejection_code IS NOT NULL))
+    CHECK ((outcome = 'CONFIRMED') = (order_id IS NOT NULL)),
+    CHECK ((outcome = 'REJECTED') = (rejection_code IS NOT NULL))
 );

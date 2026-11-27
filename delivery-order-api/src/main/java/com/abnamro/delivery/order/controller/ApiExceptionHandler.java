@@ -6,7 +6,6 @@ import com.abnamro.delivery.order.api.model.ProblemViolationsInner;
 import com.abnamro.delivery.order.configuration.CorrelationIdFilter;
 import com.abnamro.delivery.order.exception.DeliveryRejectedException;
 import com.abnamro.delivery.order.exception.IdempotencyConflictException;
-import com.abnamro.delivery.order.exception.IdempotencyInProgressException;
 import com.abnamro.delivery.order.exception.OrderNotFoundException;
 import com.abnamro.delivery.order.exception.PricingUnavailableException;
 import jakarta.validation.ConstraintViolation;
@@ -110,12 +109,6 @@ public class ApiExceptionHandler {
     ResponseEntity<Problem> handleConflict(IdempotencyConflictException ex) {
         return respond(problem(HttpStatus.CONFLICT,
                 "Idempotency-Key already used for a different request", "IDEMPOTENCY_CONFLICT"));
-    }
-
-    @ExceptionHandler(IdempotencyInProgressException.class)
-    ResponseEntity<Problem> handleInProgress(IdempotencyInProgressException ex) {
-        return respondRetryAfter(problem(HttpStatus.CONFLICT,
-                "A request with this Idempotency-Key is still being processed", "IDEMPOTENCY_IN_PROGRESS"), 1);
     }
 
     @ExceptionHandler(OrderNotFoundException.class)
