@@ -145,6 +145,30 @@ class PricingClientIT {
     }
 
     @Test
+    void treatsATotalTooLargeToStoreAsInvalid() {
+        pricing.stubFor(post(PATH).willReturn(okJson(eligible(requestId, "100000000.00"))));
+
+        assertUnavailable("invalid_response");
+    }
+
+    @Test
+    void acceptsTheLargestTotalThatCanBeStored() {
+        pricing.stubFor(post(PATH).willReturn(okJson(eligible(requestId, "99999999.99"))));
+
+        assertThat(pricingClient.evaluate(requestId, orderRequest()).price().amount())
+                .isEqualByComparingTo("99999999.99");
+    }
+
+    @Test
+    void treatsARejectionCodeTooLongToStoreAsInvalid() {
+        pricing.stubFor(post(PATH).willReturn(okJson("""
+                {"requestId":"%s","eligible":false,"rejectionCode":"%s",
+                 "message":"No","evaluatedAt":"2026-11-25T08:30:00Z"}""".formatted(requestId, "X".repeat(51)))));
+
+        assertUnavailable("invalid_response");
+    }
+
+    @Test
     void treatsAnUnreadableBodyAsInvalid() {
         pricing.stubFor(post(PATH).willReturn(okJson("not json")));
 
