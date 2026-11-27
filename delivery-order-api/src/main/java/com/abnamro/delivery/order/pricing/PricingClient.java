@@ -113,24 +113,33 @@ public class PricingClient {
         }
     }
 
-    /** Accepts only a EUR price with at most two decimals that equals the sum of its components. */
+    /**
+     * Accepts only a EUR price that equals the sum of its components. The total and every component amount must be
+     * present, non-negative and have at most two decimals.
+     */
     private Money validPrice(EligibleEvaluation eligible) {
-        if (eligible.getPrice() == null || eligible.getPrice().getAmount() == null || eligible.getPrice().getCurrency() == null
+        if (eligible.getPrice() == null || eligible.getPrice().getCurrency() == null
+                || !"EUR".equals(eligible.getPrice().getCurrency().getValue())
+                || !isValidAmount(eligible.getPrice().getAmount())
                 || eligible.getPriceComponents() == null || eligible.getPriceComponents().isEmpty()) {
             throw unavailable("invalid_response");
         }
-        BigDecimal amount = eligible.getPrice().getAmount();
-        BigDecimal sum = eligible.getPriceComponents().stream()
-                .map(PriceComponent::getAmount)
-                .reduce(BigDecimal.ZERO, (a, b) -> b == null ? a : a.add(b));
-        boolean valid = "EUR".equals(eligible.getPrice().getCurrency().getValue())
-                && amount.signum() >= 0
-                && amount.stripTrailingZeros().scale() <= 2
-                && amount.compareTo(sum) == 0;
-        if (!valid) {
+        BigDecimal componentSum = BigDecimal.ZERO;
+        for (PriceComponent component : eligible.getPriceComponents()) {
+            if (component == null || !isValidAmount(component.getAmount())) {
+                throw unavailable("invalid_response");
+            }
+            componentSum = componentSum.add(component.getAmount());
+        }
+        BigDecimal total = eligible.getPrice().getAmount();
+        if (total.compareTo(componentSum) != 0) {
             throw unavailable("invalid_response");
         }
-        return new Money(amount.setScale(2), "EUR");
+        return new Money(total.setScale(2), "EUR");
+    }
+
+    private static boolean isValidAmount(BigDecimal amount) {
+        return amount != null && amount.signum() >= 0 && amount.stripTrailingZeros().scale() <= 2;
     }
 
     private static PricingUnavailableException unavailable(String reason) {
