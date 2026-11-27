@@ -26,6 +26,6 @@ CREATE TABLE idempotency_record (
     rejection_code      VARCHAR(50),
     order_id            UUID         REFERENCES delivery_order (id),
     created_at          TIMESTAMPTZ  NOT NULL,
-    CHECK ((outcome = 'CONFIRMED') = (order_id IS NOT NULL)),
-    CHECK ((outcome = 'REJECTED') = (rejection_code IS NOT NULL))
+    CONSTRAINT confirmed_has_order      CHECK ((outcome = 'CONFIRMED') = (order_id IS NOT NULL)),
+    CONSTRAINT rejected_has_reason_code CHECK ((outcome = 'REJECTED') = (rejection_code IS NOT NULL))
 );
