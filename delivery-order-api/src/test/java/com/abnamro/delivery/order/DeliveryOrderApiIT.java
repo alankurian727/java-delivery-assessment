@@ -25,6 +25,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -172,6 +173,38 @@ class DeliveryOrderApiIT extends IntegrationTest {
     }
 
     @Test
+    void namesTheInvalidHeaderInTheViolations() throws Exception {
+        ResponseEntity<String> invalidKey = create("my key", requestJson());
+
+        HttpHeaders headers = jsonHeaders();
+        headers.set("Idempotency-Key", "key-1");
+        headers.set("X-Correlation-ID", "x".repeat(129));
+        ResponseEntity<String> invalidCorrelationId =
+                restTemplate.postForEntity(ORDERS, new HttpEntity<>(requestJson(), headers), String.class);
+
+        assertProblem(invalidKey, HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
+        assertThat(json(invalidKey).get("violations").get(0).get("field").asText()).isEqualTo("Idempotency-Key");
+        assertProblem(invalidCorrelationId, HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
+        assertThat(json(invalidCorrelationId).get("violations").get(0).get("field").asText())
+                .isEqualTo("X-Correlation-ID");
+        PRICING.verify(0, postRequestedFor(urlEqualTo(PRICING_PATH)));
+    }
+
+    @Test
+    void rejectsABodyThatIsNotValidJson() throws Exception {
+        assertProblem(create("key-1", "{not json"), HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
+    }
+
+    @Test
+    void keepsSpringsStatusAndHeadersForAnUnsupportedMethod() throws Exception {
+        ResponseEntity<String> response = restTemplate.exchange(ORDERS, HttpMethod.PUT,
+                new HttpEntity<>(requestJson(), jsonHeaders()), String.class);
+
+        assertProblem(response, HttpStatus.METHOD_NOT_ALLOWED, "REQUEST_NOT_SUPPORTED");
+        assertThat(response.getHeaders().getAllow()).contains(HttpMethod.POST);
+    }
+
+    @Test
     void returns404ForAnUnknownOrderAnd400ForAnInvalidId() throws Exception {
         assertProblem(restTemplate.getForEntity(ORDERS + "/9f3c2b1e-0000-4000-8000-000000000000", String.class),
                 HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND");
@@ -179,9 +212,14 @@ class DeliveryOrderApiIT extends IntegrationTest {
                 HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
     }
 
-    private ResponseEntity<String> create(String idempotencyKey, String body) {
+    private static HttpHeaders jsonHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
+    }
+
+    private ResponseEntity<String> create(String idempotencyKey, String body) {
+        HttpHeaders headers = jsonHeaders();
         if (idempotencyKey != null) {
             headers.set("Idempotency-Key", idempotencyKey);
         }
