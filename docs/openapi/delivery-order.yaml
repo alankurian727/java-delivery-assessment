@@ -228,7 +228,7 @@ components:
           type: string
           minLength: 1
           maxLength: 128
-          pattern: \S
+          pattern: .*\S.*
         sender:
           $ref: '#/components/schemas/Party'
         recipient:
@@ -248,7 +248,7 @@ components:
           type: string
           minLength: 1
           maxLength: 200
-          pattern: \S
+          pattern: .*\S.*
         postalCode:
           type: string
           pattern: ^[1-9][0-9]{3} ?[A-Za-z]{2}$
