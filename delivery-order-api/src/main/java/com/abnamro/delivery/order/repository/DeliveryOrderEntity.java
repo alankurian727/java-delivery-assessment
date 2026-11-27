@@ -88,6 +88,8 @@ public class DeliveryOrderEntity {
         this.createdAt = createdAt;
     }
 
+    // Mapped here because it is a few fields; the entity may depend on the domain, never the reverse.
+    // If entity mapping grows, move it to a dedicated mapper in this package.
     public DeliveryOrder toDomain() {
         return new DeliveryOrder(id, customerReference, new Money(priceAmount, priceCurrency), createdAt);
     }
