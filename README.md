@@ -175,9 +175,6 @@ Delivery Order's database tests start PostgreSQL with Testcontainers, so **Docke
 
 ## Assumptions and known limitations
 
-- **Pricing example:** the assignment's example breakdown differs from its tariff table. The table is followed:
-  EUR 6.95 base + 1.00 weight + 1.00 urban surcharge = 8.95. The urban surcharge applies when either postcode is in
-  1000AA–1099ZZ, charged once ([details](docs/openapi/README.md)).
 - **Orders exist only when eligible.** Rejected and Pricing-unavailable outcomes are reported in the POST response
   (`orderStatus`), not stored as orders, so `GET` returns confirmed orders only.
 - **A rejection is final for its key.** A corrected or retried order uses a new `Idempotency-Key`.
