@@ -24,7 +24,7 @@ public class PricingController implements PricingApi {
     public ResponseEntity<PricingEvaluationResponse> evaluatePricing(
             PricingEvaluationRequest pricingEvaluationRequest, String xCorrelationID) {
         Shipment shipment = mapper.toShipment(pricingEvaluationRequest);
-        EvaluationResult result = pricingEvaluationService.evaluate(shipment);
+        EvaluationResult result = pricingEvaluationService.evaluateShipment(shipment);
         return ResponseEntity.ok(mapper.toResponse(result));
     }
 }

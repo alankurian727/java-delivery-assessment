@@ -19,29 +19,29 @@ public class UrbanAreaSurchargeRule implements PriceComponentRule {
 
     private static final Logger log = LoggerFactory.getLogger(UrbanAreaSurchargeRule.class);
 
-    private final PostalCode from;
-    private final PostalCode to;
+    private final PostalCode urbanAreaStart;
+    private final PostalCode urbanAreaEnd;
     private final Money surcharge;
 
     public UrbanAreaSurchargeRule(TariffProperties tariff) {
-        this.from = PostalCode.of(tariff.urbanArea().from());
-        this.to = PostalCode.of(tariff.urbanArea().to());
+        this.urbanAreaStart = PostalCode.of(tariff.urbanArea().from());
+        this.urbanAreaEnd = PostalCode.of(tariff.urbanArea().to());
         this.surcharge = new Money(tariff.urbanArea().surcharge());
     }
 
     @Override
-    public Optional<PriceComponent> apply(Shipment shipment) {
-        boolean originUrban = shipment.origin().isWithin(from, to);
-        boolean destinationUrban = shipment.destination().isWithin(from, to);
-        boolean applies = originUrban || destinationUrban;
+    public Optional<PriceComponent> calculate(Shipment shipment) {
+        boolean originUrban = shipment.origin().isWithin(urbanAreaStart, urbanAreaEnd);
+        boolean destinationUrban = shipment.destination().isWithin(urbanAreaStart, urbanAreaEnd);
+        boolean surchargeApplies = originUrban || destinationUrban;
         log.atDebug().setMessage("Pricing rule evaluated")
                 .addKeyValue("event", "pricing.rule")
                 .addKeyValue("rule", "UrbanAreaSurchargeRule")
-                .addKeyValue("result", applies ? "applied" : "skipped")
+                .addKeyValue("result", surchargeApplies ? "applied" : "skipped")
                 .addKeyValue("originUrban", originUrban)
                 .addKeyValue("destinationUrban", destinationUrban)
                 .log();
-        if (applies) {
+        if (surchargeApplies) {
             return Optional.of(new PriceComponent(PriceComponentType.URBAN_AREA_SURCHARGE, surcharge));
         }
         return Optional.empty();

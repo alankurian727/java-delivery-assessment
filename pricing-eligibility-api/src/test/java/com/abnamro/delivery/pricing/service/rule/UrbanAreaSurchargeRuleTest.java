@@ -27,12 +27,12 @@ class UrbanAreaSurchargeRuleTest {
             "1000AA,5611EM",   // lower edge
             "1099ZZ,5611EM"})  // upper edge
     void chargesOnceWhenEitherEndIsUrban(String origin, String destination) {
-        assertThat(rule.apply(shipment(origin, destination, 100, DeliveryType.STANDARD))).contains(URBAN_SURCHARGE);
+        assertThat(rule.calculate(shipment(origin, destination, 100, DeliveryType.STANDARD))).contains(URBAN_SURCHARGE);
     }
 
     @ParameterizedTest(name = "{0} -> {1}")
     @CsvSource({"5611EM,3011AB", "1100AA,5611EM"})
     void addsNoComponentOutsideTheUrbanArea(String origin, String destination) {
-        assertThat(rule.apply(shipment(origin, destination, 100, DeliveryType.STANDARD))).isEmpty();
+        assertThat(rule.calculate(shipment(origin, destination, 100, DeliveryType.STANDARD))).isEmpty();
     }
 }

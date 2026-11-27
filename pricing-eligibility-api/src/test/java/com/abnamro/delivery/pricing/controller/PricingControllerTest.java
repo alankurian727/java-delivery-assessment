@@ -40,7 +40,7 @@ class PricingControllerTest {
 
     @Test
     void returnsGenericInternalErrorWithoutInternalDetails() throws Exception {
-        when(pricingEvaluationService.evaluate(any()))
+        when(pricingEvaluationService.evaluateShipment(any()))
                 .thenThrow(new IllegalStateException("connection to pricing-db.internal:5432 failed"));
 
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(VALID_REQUEST))
@@ -54,7 +54,7 @@ class PricingControllerTest {
 
     @Test
     void returnsBadRequestForAnInvalidPostalCode() throws Exception {
-        when(pricingEvaluationService.evaluate(any()))
+        when(pricingEvaluationService.evaluateShipment(any()))
                 .thenThrow(new InvalidPostalCodeException());
 
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(VALID_REQUEST))
@@ -65,7 +65,7 @@ class PricingControllerTest {
 
     @Test
     void treatsOtherIllegalArgumentsAsInternalErrors() throws Exception {
-        when(pricingEvaluationService.evaluate(any()))
+        when(pricingEvaluationService.evaluateShipment(any()))
                 .thenThrow(new IllegalArgumentException("Unexpected value 'EXPRESS' in com.example.Internal"));
 
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(VALID_REQUEST))

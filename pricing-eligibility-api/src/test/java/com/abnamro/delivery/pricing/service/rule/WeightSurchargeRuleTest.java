@@ -20,13 +20,13 @@ class WeightSurchargeRuleTest {
     @ParameterizedTest
     @ValueSource(longs = {1, 2000})
     void addsNoComponentUpTo2000Grams(long weight) {
-        assertThat(rule.apply(shipment("5611EM", "3011AB", weight, DeliveryType.STANDARD))).isEmpty();
+        assertThat(rule.calculate(shipment("5611EM", "3011AB", weight, DeliveryType.STANDARD))).isEmpty();
     }
 
     @ParameterizedTest
     @CsvSource({"2001,1.00", "5000,1.00", "5001,2.50", "10000,2.50", "10001,5.00", "20000,5.00"})
     void appliesSurchargeForWeightBand(long weight, String expected) {
-        assertThat(rule.apply(shipment("5611EM", "3011AB", weight, DeliveryType.STANDARD)))
+        assertThat(rule.calculate(shipment("5611EM", "3011AB", weight, DeliveryType.STANDARD)))
                 .contains(new PriceComponent(PriceComponentType.WEIGHT_SURCHARGE, new Money(new BigDecimal(expected))));
     }
 }
