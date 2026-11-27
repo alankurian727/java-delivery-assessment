@@ -214,6 +214,17 @@ components:
         evaluatedAt:
           type: string
           format: date-time
+    Violation:
+      type: object
+      description: One invalid field, header or parameter of the request.
+      required:
+      - field
+      - message
+      properties:
+        field:
+          type: string
+        message:
+          type: string
     Problem:
       type: object
       required:
@@ -247,14 +258,6 @@ components:
         violations:
           type: array
           items:
-            type: object
-            required:
-            - field
-            - message
-            properties:
-              field:
-                type: string
-              message:
-                type: string
+            $ref: '#/components/schemas/Violation'
       description: Error details in RFC 9457 Problem Details format. Never includes raw request input,
         personal data, stack traces, database details, internal hostnames or Java class names.
