@@ -1,14 +1,47 @@
 spring:
   application:
     name: delivery-order-api
+  profiles:
+    # Profiles: local (developer machine), dev (shared development), prod. Set SPRING_PROFILES_ACTIVE to choose.
+    default: local
   datasource:
     url: ${DELIVERY_DB_URL:jdbc:postgresql://localhost:5432/delivery}
     username: ${DELIVERY_DB_USER:delivery}
     password: ${DELIVERY_DB_PASSWORD}
+    hikari:
+      # Transactions are short and never span the Pricing call, so a small pool per instance is enough.
+      maximum-pool-size: 10
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  threads:
+    virtual:
+      # Requests wait on Pricing (up to the read timeout); virtual threads keep that from exhausting request threads.
+      enabled: true
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      use-big-decimal-for-floats: true
+      # weightInGrams is an integer in the contract: reject 2750.5 with 400 instead of truncating it to 2750.
+      accept-float-as-int: false
+    generator:
+      write-bigdecimal-as-plain: true
+
+delivery:
+  pricing:
+    base-url: ${PRICING_BASE_URL:http://localhost:8081}
+    connect-timeout: 500ms
+    # Normal Pricing latency is 50-150 ms; slower than this is treated as unavailable.
+    read-timeout: 2s
+    # One retry, only when the request never reached Pricing or it answered 502/503/504.
+    max-attempts: 2
+    circuit-breaker:
+      # Open when at least half of the last 20 calls failed (once 10 calls were made); try again after 10 s.
+      failure-rate-threshold: 50
+      sliding-window-size: 20
+      minimum-number-of-calls: 10
+      wait-duration-in-open-state: 10s
 
 springdoc:
   swagger-ui:
@@ -17,12 +50,14 @@ springdoc:
 server:
   port: 8080
 
+logging:
+  level:
+    # Default for every environment: application events at INFO. Profiles enable DEBUG explicitly.
+    root: INFO
+    com.abnamro.delivery: INFO
+
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics
-
-delivery:
-  pricing:
-    base-url: ${PRICING_BASE_URL:http://localhost:8081}

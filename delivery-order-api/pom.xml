@@ -23,6 +23,8 @@
         <contracts.dir>${project.basedir}/../docs/openapi</contracts.dir>
         <resilience4j.version>2.3.0</resilience4j.version>
         <wiremock.version>3.13.2</wiremock.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
     <dependencies>
@@ -44,13 +46,23 @@
             <version>${springdoc.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-bulkhead</artifactId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
             <version>${resilience4j.version}</version>
         </dependency>
         <dependency>
@@ -110,6 +122,19 @@
         </resources>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
@@ -152,7 +177,7 @@
                             <generateSupportingFiles>false</generateSupportingFiles>
                             <!-- PricingEvaluationResponse (oneOf without discriminator) is skipped: the pricing client
                                  maps each response to EligibleEvaluation or RejectedEvaluation by its eligible flag. -->
-                            <modelsToGenerate>PricingEvaluationRequest,EligibleEvaluation,RejectedEvaluation,Money,PriceComponent,DeliveryType,Problem,Problem_violations_inner</modelsToGenerate>
+                            <modelsToGenerate>PricingEvaluationRequest,EligibleEvaluation,RejectedEvaluation,Money,PriceComponent,DeliveryType</modelsToGenerate>
                             <configOptions>
                                 <useSpringBoot3>true</useSpringBoot3>
                                 <useBeanValidation>true</useBeanValidation>
@@ -170,6 +195,35 @@
                         <goals>
                             <goal>integration-test</goal>
                             <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Coverage of unit and integration tests: target/site/jacoco/index.html after mvn verify. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <configuration>
+                    <excludes>
+                        <!-- Generated from the OpenAPI contracts and by MapStruct. -->
+                        <exclude>com/abnamro/delivery/order/api/**</exclude>
+                        <exclude>com/abnamro/delivery/order/pricing/model/**</exclude>
+                        <exclude>**/*MapperImpl.class</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
                         </goals>
                     </execution>
                 </executions>

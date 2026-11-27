@@ -1,0 +1,6 @@
+# Developer machine (default profile).
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{correlationId:-}] %logger{20} - %msg %kvp%n"
+  level:
+    com.abnamro.delivery: DEBUG
