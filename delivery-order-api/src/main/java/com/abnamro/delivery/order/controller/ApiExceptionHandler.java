@@ -47,11 +47,11 @@ public class ApiExceptionHandler {
 
     /** Every invalid request: body fields, headers, a non-UUID orderId, or a body that is not valid JSON. */
     @ExceptionHandler({
-            MethodArgumentNotValidException.class,
-            ConstraintViolationException.class,
-            MissingRequestHeaderException.class,
-            MethodArgumentTypeMismatchException.class,
-            HttpMessageNotReadableException.class})
+            MethodArgumentNotValidException.class,     // a body field breaks its contract rule (@Valid on the body)
+            ConstraintViolationException.class,        // a header breaks its rule, e.g. a too long Idempotency-Key
+            MissingRequestHeaderException.class,       // the required Idempotency-Key header is absent
+            MethodArgumentTypeMismatchException.class, // a path value cannot be converted, e.g. orderId is not a UUID
+            HttpMessageNotReadableException.class})    // the body is not valid JSON, has a wrong type or unknown enum
     ResponseEntity<Problem> handleInvalidRequest(Exception ex) {
         Problem problem = problem(HttpStatus.BAD_REQUEST, "Invalid request", VALIDATION_FAILED);
         String reason = switch (ex) {
@@ -81,6 +81,7 @@ public class ApiExceptionHandler {
         return badRequest(problem, reason);
     }
 
+    // Unsupported country, or Pricing rejected the delivery; also when a stored rejection is returned again.
     @ExceptionHandler(DeliveryRejectedException.class)
     ResponseEntity<Problem> handleRejected(DeliveryRejectedException ex) {
         Problem problem = problem(HttpStatus.UNPROCESSABLE_ENTITY, "Delivery is not eligible", ex.getRejectionCode());
@@ -88,6 +89,7 @@ public class ApiExceptionHandler {
         return respond(problem, new HttpHeaders());
     }
 
+    // Pricing timed out, failed, sent an invalid answer, or the circuit breaker is open.
     @ExceptionHandler(PricingUnavailableException.class)
     ResponseEntity<Problem> handlePricingUnavailable(PricingUnavailableException ex) {
         Problem problem = problem(HttpStatus.SERVICE_UNAVAILABLE,
@@ -98,12 +100,14 @@ public class ApiExceptionHandler {
         return respond(problem, headers);
     }
 
+    // The Idempotency-Key already has an outcome for a different request.
     @ExceptionHandler(IdempotencyConflictException.class)
     ResponseEntity<Problem> handleConflict(IdempotencyConflictException ex) {
         return respond(problem(HttpStatus.CONFLICT,
                 "Idempotency-Key already used for a different request", "IDEMPOTENCY_CONFLICT"), new HttpHeaders());
     }
 
+    // GET for an order ID that does not exist (never confirmed, or unknown).
     @ExceptionHandler(OrderNotFoundException.class)
     ResponseEntity<Problem> handleNotFound(OrderNotFoundException ex) {
         return respond(problem(HttpStatus.NOT_FOUND, "Order not found", "ORDER_NOT_FOUND"), new HttpHeaders());
@@ -115,6 +119,8 @@ public class ApiExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     ResponseEntity<Problem> handleOther(Exception ex) {
+        // Spring's request errors implement ErrorResponse: 405 wrong method, 415 wrong Content-Type,
+        // 406 unsupported Accept header, 404 unknown path.
         if (ex instanceof ErrorResponse springError) {
             HttpStatus status = HttpStatus.valueOf(springError.getStatusCode().value());
             return respond(problem(status, status.getReasonPhrase(), REQUEST_NOT_SUPPORTED), springError.getHeaders());

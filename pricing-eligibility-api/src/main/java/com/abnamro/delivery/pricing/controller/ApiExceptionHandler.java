@@ -38,10 +38,10 @@ public class ApiExceptionHandler {
      * the domain rejects (the contract's pattern normally rejects it first).
      */
     @ExceptionHandler({
-            MethodArgumentNotValidException.class,
-            ConstraintViolationException.class,
-            HttpMessageNotReadableException.class,
-            InvalidPostalCodeException.class})
+            MethodArgumentNotValidException.class, // a body field breaks its contract rule (@Valid on the body)
+            ConstraintViolationException.class,    // the X-Correlation-ID header breaks its rule
+            HttpMessageNotReadableException.class, // the body is not valid JSON, has a wrong type or unknown enum
+            InvalidPostalCodeException.class})     // the domain rejects a postal code the contract let through
     ResponseEntity<Problem> handleInvalidRequest(Exception ex) {
         Problem problem = problem(HttpStatus.BAD_REQUEST, "Invalid evaluation request", VALIDATION_FAILED);
         String reason = switch (ex) {
@@ -73,6 +73,8 @@ public class ApiExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     ResponseEntity<Problem> handleOther(Exception ex) {
+        // Spring's request errors implement ErrorResponse: 405 wrong method, 415 wrong Content-Type,
+        // 406 unsupported Accept header, 404 unknown path.
         if (ex instanceof ErrorResponse springError) {
             HttpStatus status = HttpStatus.valueOf(springError.getStatusCode().value());
             return respond(problem(status, status.getReasonPhrase(), REQUEST_NOT_SUPPORTED), springError.getHeaders());
