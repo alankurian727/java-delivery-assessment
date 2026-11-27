@@ -23,7 +23,7 @@ services with their Maven wrappers and starts PostgreSQL on the Compose network.
 Use `docker compose logs -f` to view logs and `docker compose down` to stop the
 stack. PostgreSQL data persists in the named volume.
 
-For an optional local override, set `DELIVERY_DB_PASSWORD` in the shell or in a root `.env` file before the first startup. An existing database keeps its current password. See [deployment improvements](docs/improvements/) for production configuration.
+For an optional local override, set `DELIVERY_DB_PASSWORD` in the shell or in a root `.env` file before the first startup. An existing database keeps its current password. See [deployment improvements](docs/improvements/deployment.md) for production configuration.
 
 ## Example requests
 

@@ -206,4 +206,4 @@ erDiagram
   `pricing.circuit_state_changed`. Names, postcodes and request bodies are never logged.
 - Actuator: `/actuator/health`, `/actuator/info`, `/actuator/metrics`.
 
-See [decision records](decisions/), [API contracts](openapi/), and [deployment improvements](improvements/).
+See [decision records](decisions/), [API contracts](openapi/), [deployment improvements](improvements/deployment.md), and [idempotency record retention](improvements/idempotency-record-retention.md).

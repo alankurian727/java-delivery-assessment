@@ -18,7 +18,3 @@ Pricing needs no database credentials. The example values above describe local d
 - Remove the hardcoded local fallback for deployment. Inject a unique database password as `DELIVERY_DB_PASSWORD` through the deployment platform's secret manager and rotate it separately from application releases. Configure the JDBC URL and Pricing endpoint for each environment.
 - Restrict network access to Pricing, PostgreSQL, and Actuator management endpoints. Use authenticated, encrypted connections where required by the deployment.
 - Define database backups and restore testing, along with alerts for pricing failures, latency, and database availability.
-
-## Other improvements
-
-- [Idempotency record retention](idempotency-record-retention.md): delete idempotency records after a retention period so the table stays bounded.
