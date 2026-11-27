@@ -14,6 +14,7 @@ import com.abnamro.delivery.order.repository.IdempotencyRecordEntity;
 import com.abnamro.delivery.order.repository.IdempotencyRecordRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,7 +122,8 @@ public class IdempotencyService {
                 decision.price().amount(),
                 decision.price().currency(),
                 decision.pricingRequestId(),
-                clock.instant()));
+                // PostgreSQL stores microseconds; truncate so a replayed response is identical to the first one.
+                clock.instant().truncatedTo(ChronoUnit.MICROS)));
         // If another request took the key over meanwhile, this throws and the order insert is rolled back.
         finish(key, version, IdempotencyState.COMPLETED, null, order.getId());
         return order.toDomain();
