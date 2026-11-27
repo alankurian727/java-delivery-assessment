@@ -65,7 +65,7 @@ paths:
                 price:
                   amount: 8.95
                   currency: EUR
-                createdAt: '2026-11-25T08:30:00Z'
+                createdAt: '2026-11-25T09:30:00+01:00'
           headers:
             Location:
               description: Relative URI of the confirmed order.
@@ -179,7 +179,7 @@ paths:
                 price:
                   amount: 8.95
                   currency: EUR
-                createdAt: '2026-11-25T08:30:00Z'
+                createdAt: '2026-11-25T09:30:00+01:00'
         '400':
           description: Invalid order identifier
           content:
@@ -305,6 +305,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          description: Moment the order was confirmed, with the Europe/Amsterdam offset (stored in UTC).
     Money:
       type: object
       required:
@@ -347,8 +348,8 @@ components:
           type: string
           description: 'Machine-readable code identifying the error. Known values: VALIDATION_FAILED,
             IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS, UNSUPPORTED_COUNTRY, WEIGHT_LIMIT_EXCEEDED,
-            SAME_DAY_NOT_SUPPORTED, ORDER_NOT_FOUND, PRICING_UNAVAILABLE, INTERNAL_ERROR. Clients must tolerate
-            new values.'
+            SAME_DAY_NOT_SUPPORTED, ORDER_NOT_FOUND, PRICING_UNAVAILABLE, REQUEST_NOT_SUPPORTED, INTERNAL_ERROR.
+            Clients must tolerate new values.'
           example: VALIDATION_FAILED
         correlationId:
           type: string
