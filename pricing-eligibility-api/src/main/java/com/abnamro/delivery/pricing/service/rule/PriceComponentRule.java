@@ -7,5 +7,5 @@ import java.util.Optional;
 /** Adds one component to the price of an eligible shipment. Implementations run in {@code @Order} order. */
 public interface PriceComponentRule {
 
-    Optional<PriceComponent> apply(Shipment shipment);
+    Optional<PriceComponent> calculate(Shipment shipment);
 }

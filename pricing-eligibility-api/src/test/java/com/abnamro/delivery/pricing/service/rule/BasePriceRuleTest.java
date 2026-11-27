@@ -19,7 +19,7 @@ class BasePriceRuleTest {
     @ParameterizedTest
     @CsvSource({"STANDARD,4.95", "NEXT_DAY,6.95", "SAME_DAY,11.95"})
     void appliesBasePricePerDeliveryType(DeliveryType deliveryType, String expected) {
-        assertThat(rule.apply(shipment("5611EM", "5611AB", 100, deliveryType)))
+        assertThat(rule.calculate(shipment("5611EM", "5611AB", 100, deliveryType)))
                 .contains(new PriceComponent(PriceComponentType.BASE_PRICE, new Money(new BigDecimal(expected))));
     }
 }

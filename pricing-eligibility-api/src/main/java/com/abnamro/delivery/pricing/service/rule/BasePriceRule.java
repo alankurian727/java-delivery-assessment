@@ -27,19 +27,19 @@ public class BasePriceRule implements PriceComponentRule {
     }
 
     @Override
-    public Optional<PriceComponent> apply(Shipment shipment) {
-        BigDecimal basePrice = basePrices.get(shipment.deliveryType());
-        if (basePrice == null) {
+    public Optional<PriceComponent> calculate(Shipment shipment) {
+        BigDecimal configuredPrice = basePrices.get(shipment.deliveryType());
+        if (configuredPrice == null) {
             throw new IllegalStateException("No base price configured for " + shipment.deliveryType());
         }
-        Money amount = new Money(basePrice);
+        Money basePrice = new Money(configuredPrice);
         log.atDebug().setMessage("Pricing rule evaluated")
                 .addKeyValue("event", "pricing.rule")
                 .addKeyValue("rule", "BasePriceRule")
                 .addKeyValue("result", "applied")
                 .addKeyValue("deliveryType", shipment.deliveryType())
-                .addKeyValue("amount", amount.amount())
+                .addKeyValue("amount", basePrice.amount())
                 .log();
-        return Optional.of(new PriceComponent(PriceComponentType.BASE_PRICE, amount));
+        return Optional.of(new PriceComponent(PriceComponentType.BASE_PRICE, basePrice));
     }
 }

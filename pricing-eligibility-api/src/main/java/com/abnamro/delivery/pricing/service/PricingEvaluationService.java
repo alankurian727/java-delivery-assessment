@@ -36,7 +36,7 @@ public class PricingEvaluationService {
         this.clock = clock;
     }
 
-    public EvaluationResult evaluate(Shipment shipment) {
+    public EvaluationResult evaluateShipment(Shipment shipment) {
         Instant evaluatedAt = clock.instant();
 
         for (EligibilityRule rule : eligibilityRules) {
@@ -52,11 +52,11 @@ public class PricingEvaluationService {
             }
         }
 
-        List<PriceComponent> components = priceComponentRules.stream()
-                .map(rule -> rule.apply(shipment))
+        List<PriceComponent> priceComponents = priceComponentRules.stream()
+                .map(rule -> rule.calculate(shipment))
                 .flatMap(Optional::stream)
                 .toList();
-        Money total = components.stream()
+        Money totalPrice = priceComponents.stream()
                 .map(PriceComponent::amount)
                 .reduce(Money.ZERO, Money::plus);
         log.atInfo().setMessage("Pricing evaluated")
@@ -64,8 +64,8 @@ public class PricingEvaluationService {
                 .addKeyValue("pricingRequestId", shipment.requestId())
                 .addKeyValue("outcome", "ELIGIBLE")
                 .addKeyValue("deliveryType", shipment.deliveryType())
-                .addKeyValue("total", total.amount())
+                .addKeyValue("total", totalPrice.amount())
                 .log();
-        return EvaluationResult.eligible(shipment.requestId(), total, components, evaluatedAt);
+        return EvaluationResult.eligible(shipment.requestId(), totalPrice, priceComponents, evaluatedAt);
     }
 }

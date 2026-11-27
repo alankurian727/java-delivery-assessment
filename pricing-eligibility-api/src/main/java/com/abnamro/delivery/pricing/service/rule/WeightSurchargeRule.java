@@ -27,12 +27,13 @@ public class WeightSurchargeRule implements PriceComponentRule {
     }
 
     @Override
-    public Optional<PriceComponent> apply(Shipment shipment) {
+    public Optional<PriceComponent> calculate(Shipment shipment) {
         Money surcharge = weightBands.stream()
                 .filter(band -> shipment.weightInGrams() <= band.upToGrams())
                 .findFirst()
                 .map(band -> new Money(band.surcharge()))
-                .orElseThrow(() -> new IllegalStateException("No weight band covers " + shipment.weightInGrams() + " grams"));
+                .orElseThrow(() -> new IllegalStateException(
+                        "No weight band covers " + shipment.weightInGrams() + " grams"));
         log.atDebug().setMessage("Pricing rule evaluated")
                 .addKeyValue("event", "pricing.rule")
                 .addKeyValue("rule", "WeightSurchargeRule")

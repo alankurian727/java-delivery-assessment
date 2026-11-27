@@ -38,7 +38,7 @@ class PricingEvaluationServiceTest {
 
     @Test
     void pricesTheAssignmentExample() {
-        EvaluationResult result = service.evaluate(shipment("1012AB", "5611EM", 2750, DeliveryType.NEXT_DAY));
+        EvaluationResult result = service.evaluateShipment(shipment("1012AB", "5611EM", 2750, DeliveryType.NEXT_DAY));
 
         assertThat(result.isEligible()).isTrue();
         assertThat(result.requestId()).isEqualTo(REQUEST_ID);
@@ -57,7 +57,7 @@ class PricingEvaluationServiceTest {
             "SAME_DAY,1012AB,1012XY,20000,17.95"})  // same area, heaviest eligible parcel
     void totalIsTheSumOfAllApplicableComponents(DeliveryType type, String origin, String destination,
                                                 long weight, String expectedTotal) {
-        EvaluationResult result = service.evaluate(shipment(origin, destination, weight, type));
+        EvaluationResult result = service.evaluateShipment(shipment(origin, destination, weight, type));
 
         assertThat(result.isEligible()).isTrue();
         assertThat(result.total().amount()).isEqualTo(new BigDecimal(expectedTotal));
@@ -65,7 +65,7 @@ class PricingEvaluationServiceTest {
 
     @Test
     void rejectsWithoutPricing() {
-        EvaluationResult result = service.evaluate(shipment("1012AB", "5611EM", 100, DeliveryType.SAME_DAY));
+        EvaluationResult result = service.evaluateShipment(shipment("1012AB", "5611EM", 100, DeliveryType.SAME_DAY));
 
         assertThat(result.isEligible()).isFalse();
         assertThat(result.rejection().code()).isEqualTo(RejectionCode.SAME_DAY_NOT_SUPPORTED);
@@ -76,7 +76,7 @@ class PricingEvaluationServiceTest {
 
     @Test
     void firstRejectionWins() {
-        EvaluationResult result = service.evaluate(shipment("1012AB", "5611EM", 25000, DeliveryType.SAME_DAY));
+        EvaluationResult result = service.evaluateShipment(shipment("1012AB", "5611EM", 25000, DeliveryType.SAME_DAY));
 
         assertThat(result.rejection().code()).isEqualTo(RejectionCode.WEIGHT_LIMIT_EXCEEDED);
     }
