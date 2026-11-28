@@ -1,0 +1,641 @@
+{
+  "info": {
+    "name": "Pricing & Eligibility API",
+    "description": "Evaluate delivery eligibility and price. Select the **Local** environment. Each request uses a new `requestId`.\n\nIn production Pricing is called only by Delivery Order; these requests are for local testing.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Eligible (200)",
+      "description": "",
+      "item": [
+        {
+          "name": "Assignment example: NEXT_DAY 2,750 g, urban origin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"1012 AB\",\n  \"destinationPostalCode\": \"5611EM\",\n  \"weightInGrams\": 2750,\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "8.95 = 6.95 base + 1.00 weight + 1.00 urban surcharge."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Eligible, price 8.95\", () => {",
+                  "    pm.expect(body.eligible).to.eql(true);",
+                  "    pm.expect(body.price).to.eql({ amount: 8.95, currency: \"EUR\" });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STANDARD 2,000 g, no surcharges",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"5611EM\",\n  \"destinationPostalCode\": \"3011AB\",\n  \"weightInGrams\": 2000,\n  \"deliveryType\": \"STANDARD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Eligible, price 4.95\", () => {",
+                  "    pm.expect(body.eligible).to.eql(true);",
+                  "    pm.expect(body.price).to.eql({ amount: 4.95, currency: \"EUR\" });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STANDARD 20,000 g, heaviest eligible",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"5611EM\",\n  \"destinationPostalCode\": \"3011AB\",\n  \"weightInGrams\": 20000,\n  \"deliveryType\": \"STANDARD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Eligible, price 9.95\", () => {",
+                  "    pm.expect(body.eligible).to.eql(true);",
+                  "    pm.expect(body.price).to.eql({ amount: 9.95, currency: \"EUR\" });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Both postal codes urban",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"1012AB\",\n  \"destinationPostalCode\": \"1099ZZ\",\n  \"weightInGrams\": 500,\n  \"deliveryType\": \"STANDARD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The urban surcharge is charged once."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Eligible, price 5.95\", () => {",
+                  "    pm.expect(body.eligible).to.eql(true);",
+                  "    pm.expect(body.price).to.eql({ amount: 5.95, currency: \"EUR\" });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SAME_DAY within one area",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"1012AB\",\n  \"destinationPostalCode\": \"1012XY\",\n  \"weightInGrams\": 15000,\n  \"deliveryType\": \"SAME_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Eligible, price 17.95\", () => {",
+                  "    pm.expect(body.eligible).to.eql(true);",
+                  "    pm.expect(body.price).to.eql({ amount: 17.95, currency: \"EUR\" });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Business rejections (200, eligible: false)",
+      "description": "A rejection is a successful evaluation with the answer \"no\", not an error.",
+      "item": [
+        {
+          "name": "Weight above 20,000 g",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"5611EM\",\n  \"destinationPostalCode\": \"3011AB\",\n  \"weightInGrams\": 20001,\n  \"deliveryType\": \"STANDARD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Not eligible: WEIGHT_LIMIT_EXCEEDED\", () => {",
+                  "    pm.expect(pm.response.json().eligible).to.eql(false);",
+                  "    pm.expect(pm.response.json().rejectionCode).to.eql(\"WEIGHT_LIMIT_EXCEEDED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SAME_DAY between different areas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"5611EM\",\n  \"destinationPostalCode\": \"1012AB\",\n  \"weightInGrams\": 100,\n  \"deliveryType\": \"SAME_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Not eligible: SAME_DAY_NOT_SUPPORTED\", () => {",
+                  "    pm.expect(pm.response.json().eligible).to.eql(false);",
+                  "    pm.expect(pm.response.json().rejectionCode).to.eql(\"SAME_DAY_NOT_SUPPORTED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Invalid requests (400)",
+      "description": "",
+      "item": [
+        {
+          "name": "Invalid postal code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"0123AB\",\n  \"destinationPostalCode\": \"5611EM\",\n  \"weightInGrams\": 2750,\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Zero weight",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"1012AB\",\n  \"destinationPostalCode\": \"5611EM\",\n  \"weightInGrams\": 0,\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unsupported delivery type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{$guid}}\",\n  \"originPostalCode\": \"1012AB\",\n  \"destinationPostalCode\": \"5611EM\",\n  \"weightInGrams\": 2750,\n  \"deliveryType\": \"EXPRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed JSON",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/api/v1/pricing/evaluations",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "evaluations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"requestId\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Operations",
+      "description": "",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{pricingBaseUrl}}/actuator/health",
+              "host": [
+                "{{pricingBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

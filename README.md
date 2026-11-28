@@ -78,6 +78,11 @@ Retrieve the order with the ID from the `Location` header:
 curl -s http://localhost:8080/api/v1/delivery-orders/<orderId>
 ```
 
+### Postman
+
+[`postman/`](postman/) has a Postman collection for each API and a **Local** environment, covering the same
+scenarios with tests for every response. See [`postman/README.md`](postman/README.md).
+
 ### Pricing & Eligibility
 
 These `curl` commands call the Pricing & Eligibility API directly.
