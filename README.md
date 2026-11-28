@@ -12,7 +12,8 @@ when it is eligible.
 - [Architecture](docs/architecture.md): request flow, business scenarios, retries and circuit breaker, concurrency and
   the data model, with diagrams.
 - [API contracts](docs/openapi/): OpenAPI definitions both services generate their code from.
-- [Improvements](docs/improvements/): [deployment](docs/improvements/deployment.md) and
+- [Improvements](docs/improvements/): [deployment](docs/improvements/deployment.md),
+  [production authentication and authorisation](docs/improvements/authentication.md), and
   [idempotency record retention](docs/improvements/idempotency-record-retention.md).
 
 ## How Delivery Order behaves
@@ -178,9 +179,11 @@ Delivery Order's database tests start PostgreSQL with Testcontainers, so **Docke
 - **Orders exist only when eligible.** Rejected and Pricing-unavailable outcomes are reported in the POST response
   (`orderStatus`), not stored as orders, so `GET` returns confirmed orders only.
 - **A rejection is final for its key.** A corrected or retried order uses a new `Idempotency-Key`.
-- **Idempotency keys are global**, because there is no authentication yet. In production they would be scoped per
-  authenticated client.
-- **Not implemented:** authentication, the idempotency record clean-up job, exporting traces to a tracing backend
+- **No authentication yet.** In production, both services would accept OAuth 2.0 JWT access tokens from an identity
+  provider, checking scopes per endpoint, and Delivery Order would call Pricing with its own client-credentials
+  token. Idempotency keys, global today, would then be scoped per client. See
+  [production authentication and authorisation](docs/improvements/authentication.md).
+- **Not implemented:** authentication (see above), the idempotency record clean-up job, exporting traces to a tracing backend
   (trace and span IDs are logged and propagated, but spans are not sent anywhere), and Markdown copies of the
   decision records in `docs/decisions/`.
 - **Database changes:** the schema is a single Flyway migration. If you ran an earlier version locally, recreate the
