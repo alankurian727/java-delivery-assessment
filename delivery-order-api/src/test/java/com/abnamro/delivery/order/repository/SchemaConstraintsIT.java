@@ -50,6 +50,15 @@ class SchemaConstraintsIT extends IntegrationTest {
     }
 
     @Test
+    void keepsRowValuesOutOfDatabaseErrorMessages() {
+        assertThatThrownBy(() -> jdbc.update(INSERT_ORDER, UUID.randomUUID(), 0, new BigDecimal("8.95")))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("positive_weight")
+                .satisfies(error -> assertThat(error).rootCause().message()
+                        .doesNotContain("Test Sender", "Test Recipient", "1012AB", "Failing row"));
+    }
+
+    @Test
     void refusesInvalidOrderValues() {
         assertRefused(() -> jdbc.update(INSERT_ORDER, UUID.randomUUID(), 0, 8.95), "positive_weight");
         assertRefused(() -> jdbc.update(INSERT_ORDER, UUID.randomUUID(), 2750, -1), "whole_cents_price");

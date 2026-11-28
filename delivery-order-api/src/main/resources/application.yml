@@ -11,6 +11,10 @@ spring:
     hikari:
       # Transactions are short and never span the Pricing call, so a small pool per instance is enough.
       maximum-pool-size: 10
+      data-source-properties:
+        # Leave PostgreSQL's error detail ("Failing row contains ...") out of exception messages, so a database
+        # error logged by the 500 handler never contains row values such as names or postal codes.
+        logServerErrorDetail: false
   jpa:
     open-in-view: false
     hibernate:
