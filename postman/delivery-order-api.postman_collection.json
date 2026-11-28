@@ -1,0 +1,868 @@
+{
+  "info": {
+    "name": "Delivery Order API",
+    "description": "Create and retrieve delivery orders. Select the **Local** environment. Folder 1 runs in order; the other folders use a new Idempotency-Key per request.\n\nTo see 503 `PRICING_UNAVAILABLE`, stop Pricing (`docker compose stop pricing-eligibility-api`) and run \"Create order\"; start it again and repeat the request with the same key to get 201.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "idempotencyKey",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create and retrieve",
+      "description": "Run in order: the create request sets `idempotencyKey` and `orderId`, which the next requests use.",
+      "item": [
+        {
+          "name": "Create order (eligible)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"1012AB\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"NL\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 2750\n  },\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The assignment's example: 8.95 = 6.95 NEXT_DAY base + 1.00 weight (2,750 g) + 1.00 urban surcharge (1012AB)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A new Idempotency-Key for this request, kept for the requests that repeat it.",
+                  "pm.collectionVariables.set(\"idempotencyKey\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const order = pm.response.json();",
+                  "pm.test(\"Order is confirmed with the price\", () => {",
+                  "    pm.expect(order.status).to.eql(\"CONFIRMED\");",
+                  "    pm.expect(order.price).to.eql({ amount: 8.95, currency: \"EUR\" });",
+                  "    pm.expect(order.createdAt).to.match(/[+-]\\d{2}:\\d{2}$/);",
+                  "});",
+                  "pm.test(\"Location points to the order\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/api/v1/delivery-orders/\" + order.orderId);",
+                  "});",
+                  "pm.collectionVariables.set(\"orderId\", order.orderId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Repeat the same request and key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"1012 ab\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"NL\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 2750\n  },\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Same key and the same request (the postal code is written differently but normalises to 1012AB): the stored order is returned; Pricing is not called again."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Same order is returned\", () => pm.expect(pm.response.json().orderId).to.eql(pm.collectionVariables.get(\"orderId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same key, different request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"1012AB\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"NL\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 3000\n  },\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Problem Details with code IDEMPOTENCY_CONFLICT\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"IDEMPOTENCY_CONFLICT\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders/{{orderId}}",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Stored order and price\", () => {",
+                  "    pm.expect(pm.response.json().orderId).to.eql(pm.collectionVariables.get(\"orderId\"));",
+                  "    pm.expect(pm.response.json().price.amount).to.eql(8.95);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Business rejections (422)",
+      "description": "Valid requests that are not eligible. No order is created; repeating the request with the same key returns the same 422.",
+      "item": [
+        {
+          "name": "Weight above 20,000 g",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{freshKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"1012AB\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"NL\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 25000\n  },\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"freshKey\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem Details with code WEIGHT_LIMIT_EXCEEDED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"WEIGHT_LIMIT_EXCEEDED\");",
+                  "});",
+                  "pm.test(\"orderStatus is REJECTED\", () => pm.expect(pm.response.json().orderStatus).to.eql(\"REJECTED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same-day between different areas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{freshKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"1012AB\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"NL\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 500\n  },\n  \"deliveryType\": \"SAME_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"freshKey\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem Details with code SAME_DAY_NOT_SUPPORTED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"SAME_DAY_NOT_SUPPORTED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recipient outside NL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{freshKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"1012AB\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"BE\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 2750\n  },\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Rejected by Delivery Order itself; Pricing is not called."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"freshKey\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem Details with code UNSUPPORTED_COUNTRY\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"UNSUPPORTED_COUNTRY\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Invalid requests (400)",
+      "description": "Rejected before Pricing is called. Violations name the field; submitted values are never echoed.",
+      "item": [
+        {
+          "name": "Invalid postal code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{freshKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"0123AB\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"NL\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 2750\n  },\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"freshKey\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});",
+                  "pm.test(\"Violation names the field\", () => pm.expect(pm.response.json().violations[0].field).to.eql(\"sender.postalCode\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Zero weight",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{freshKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"1012AB\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"NL\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 0\n  },\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"freshKey\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unsupported delivery type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{freshKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"1012AB\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"NL\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 2750\n  },\n  \"deliveryType\": \"EXPRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"freshKey\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing Idempotency-Key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerReference\": \"CUSTOMER-ORDER-2026-001\",\n  \"sender\": {\n    \"name\": \"Test Sender\",\n    \"postalCode\": \"1012AB\",\n    \"countryCode\": \"NL\"\n  },\n  \"recipient\": {\n    \"name\": \"Test Recipient\",\n    \"postalCode\": \"5611EM\",\n    \"countryCode\": \"NL\"\n  },\n  \"parcel\": {\n    \"weightInGrams\": 2750\n  },\n  \"deliveryType\": \"NEXT_DAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});",
+                  "pm.test(\"Violation names the header\", () => pm.expect(pm.response.json().violations[0].field).to.eql(\"Idempotency-Key\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed JSON",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{freshKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerReference\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"freshKey\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Retrieval errors",
+      "description": "",
+      "item": [
+        {
+          "name": "Unknown order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Problem Details with code ORDER_NOT_FOUND\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"ORDER_NOT_FOUND\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid order ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/api/v1/delivery-orders/not-a-uuid",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "delivery-orders",
+                "not-a-uuid"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem Details with code VALIDATION_FAILED\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Operations",
+      "description": "",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{deliveryOrderBaseUrl}}/actuator/health",
+              "host": [
+                "{{deliveryOrderBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
