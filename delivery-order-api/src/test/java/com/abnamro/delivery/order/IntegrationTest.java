@@ -6,6 +6,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,6 +20,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * reused; each test starts from empty tables, no stubs and a closed circuit.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+// Spring Boot disables tracing in tests by default; enable it so trace propagation to Pricing is tested.
+@AutoConfigureObservability(metrics = false)
 public abstract class IntegrationTest {
 
     @ServiceConnection
