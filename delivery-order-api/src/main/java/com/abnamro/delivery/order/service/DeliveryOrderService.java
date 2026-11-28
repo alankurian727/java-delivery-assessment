@@ -21,9 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Creates orders following ADR-005: an order is created only when Pricing returns an eligible, valid evaluation.
- * The outcome is recorded once per Idempotency-Key and returned again for repeated requests (ADR-008); when Pricing is
- * unavailable nothing is recorded, so the client can retry with the same key.
+ * Creates orders following ADR-0003: an order is created only when Pricing returns an eligible, valid evaluation.
+ * The Idempotency-Key is bound to the request when it is first received, and its outcome is recorded once (ADR-0010).
+ * When Pricing is unavailable the key stays bound without an outcome, so only the same request can retry it.
  */
 @Service
 public class DeliveryOrderService {
@@ -51,23 +51,23 @@ public class DeliveryOrderService {
 
     public DeliveryOrder createOrder(String idempotencyKey, OrderRequest request) {
         String fingerprint = requestFingerprint.compute(request);
-        Optional<UUID> existingOrderId = idempotencyService.findPreviousOutcome(idempotencyKey, fingerprint);
+        Optional<UUID> existingOrderId = idempotencyService.bindOrFindOutcome(idempotencyKey, fingerprint);
         if (existingOrderId.isPresent()) {
             return retrieveOrder(existingOrderId.get());
         }
         try {
-            return evaluateNewOrder(idempotencyKey, fingerprint, request);
+            return evaluateNewOrder(idempotencyKey, request);
         } catch (OutcomeAlreadyRecordedException e) {
-            // A concurrent request with the same key recorded its outcome first: answer with that outcome.
-            return idempotencyService.findPreviousOutcome(idempotencyKey, fingerprint)
+            // A concurrent request with the same key decided it first: answer with that outcome.
+            return idempotencyService.bindOrFindOutcome(idempotencyKey, fingerprint)
                     .map(this::retrieveOrder)
                     .orElseThrow(() -> new IllegalStateException("Recorded outcome not found"));
         }
     }
 
-    private DeliveryOrder evaluateNewOrder(String idempotencyKey, String fingerprint, OrderRequest request) {
+    private DeliveryOrder evaluateNewOrder(String idempotencyKey, OrderRequest request) {
         if (!request.isWithinNetherlands()) {
-            idempotencyService.recordRejection(idempotencyKey, fingerprint, UNSUPPORTED_COUNTRY);
+            idempotencyService.recordRejection(idempotencyKey, UNSUPPORTED_COUNTRY);
             logRejection(UNSUPPORTED_COUNTRY, null);
             throw new DeliveryRejectedException(UNSUPPORTED_COUNTRY);
         }
@@ -77,7 +77,7 @@ public class DeliveryOrderService {
         try {
             pricingDecision = pricingClient.evaluate(pricingRequestId, request);
         } catch (PricingUnavailableException e) {
-            // Nothing was recorded, so a retry with the same key is evaluated as a new request.
+            // No outcome is recorded: the same request can retry with the same key; a different one gets 409.
             log.atWarn().setMessage("Order not created: Pricing unavailable")
                     .addKeyValue("event", "order.pricing_unavailable")
                     .addKeyValue("pricingRequestId", pricingRequestId)
@@ -87,12 +87,12 @@ public class DeliveryOrderService {
         }
 
         if (!pricingDecision.isEligible()) {
-            idempotencyService.recordRejection(idempotencyKey, fingerprint, pricingDecision.rejectionCode());
+            idempotencyService.recordRejection(idempotencyKey, pricingDecision.rejectionCode());
             logRejection(pricingDecision.rejectionCode(), pricingRequestId);
             throw new DeliveryRejectedException(pricingDecision.rejectionCode());
         }
 
-        DeliveryOrder order = confirmOrder(idempotencyKey, fingerprint, request, pricingDecision);
+        DeliveryOrder order = confirmOrder(idempotencyKey, request, pricingDecision);
         log.atInfo().setMessage("Order created")
                 .addKeyValue("event", "order.created")
                 .addKeyValue("orderId", order.id())
@@ -104,11 +104,10 @@ public class DeliveryOrderService {
     }
 
     /**
-     * Saves the order and records it under the key in one transaction. If another request recorded this key first,
-     * the exception rolls the order back, so a key never has more than one order (ADR-008).
+     * Saves the order and records it as the key's outcome in one transaction. If another request decided this key
+     * first, the exception rolls the order back, so a key never has more than one order (ADR-0001).
      */
-    private DeliveryOrder confirmOrder(String idempotencyKey, String fingerprint, OrderRequest request,
-                                       PricingDecision pricingDecision) {
+    private DeliveryOrder confirmOrder(String idempotencyKey, OrderRequest request, PricingDecision pricingDecision) {
         return transactionTemplate.execute(status -> {
             // PostgreSQL stores microseconds; truncate so a repeated request gets the same createdAt as the first.
             Instant createdAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
@@ -116,7 +115,7 @@ public class DeliveryOrderService {
                     UUID.randomUUID(), request, pricingDecision.price(), pricingDecision.pricingRequestId(), createdAt);
             // Flushed now: the idempotency record references the order by foreign key.
             orderRepository.saveAndFlush(orderEntity);
-            idempotencyService.recordConfirmation(idempotencyKey, fingerprint, orderEntity.getId());
+            idempotencyService.recordConfirmation(idempotencyKey, orderEntity.getId());
             return orderEntity.toDomain();
         });
     }

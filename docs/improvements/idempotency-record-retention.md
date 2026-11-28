@@ -4,7 +4,7 @@ Status: not implemented. Production improvement for Delivery Order.
 
 ## Problem
 
-Every decided request writes one row to `idempotency_record` (ADR-008), and nothing deletes it. The table therefore
+Every key received writes one row to `idempotency_record` (ADR-0010), and nothing deletes it. The table therefore
 grows for as long as the service runs. This covers all outcomes; rejections are only a fraction of the rows.
 
 A record is only needed while a client may still retry the same request. After that it has no purpose: the order, if

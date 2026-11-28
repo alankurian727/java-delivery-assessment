@@ -145,11 +145,28 @@ class DeliveryOrderApiIT extends IntegrationTest {
         assertThat(unavailable.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("5");
         assertThat(json(unavailable).get("orderStatus").asText()).isEqualTo("PRICING_UNAVAILABLE");
         assertThat(count("delivery_order")).isZero();
-        assertThat(count("idempotency_record")).isZero();
+        // The key is bound to the request, but has no outcome.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM idempotency_record WHERE outcome IS NULL", Integer.class))
+                .isEqualTo(1);
 
         PRICING.resetAll();
         pricingAnswers(eligible("8.95"));
         assertThat(create("key-1", requestJson()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void keepsTheKeyBoundToTheOriginalRequestWhenPricingWasUnavailable() throws Exception {
+        pricingAnswers(aResponse().withStatus(503));
+        assertProblem(create("key-1", requestJson("1012AB", 2000, "NL")), HttpStatus.SERVICE_UNAVAILABLE,
+                "PRICING_UNAVAILABLE");
+
+        PRICING.resetAll();
+        pricingAnswers(eligible("8.95"));
+
+        // A different parcel cannot reuse the key; the original request can still be retried.
+        assertProblem(create("key-1", requestJson("1012AB", 10000, "NL")), HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT");
+        assertThat(create("key-1", requestJson("1012AB", 2000, "NL")).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(count("delivery_order")).isEqualTo(1);
     }
 
     @Test
@@ -178,6 +195,27 @@ class DeliveryOrderApiIT extends IntegrationTest {
 
         assertThat(responses).allSatisfy(response -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED));
         assertThat(responses.stream().map(this::orderIdOf).distinct()).hasSize(1);
+        assertThat(count("delivery_order")).isEqualTo(1);
+        assertThat(count("idempotency_record")).isEqualTo(1);
+    }
+
+    @Test
+    void acceptsOnlyTheFirstOfConcurrentDifferentRequestsWithTheSameKey() throws Exception {
+        pricingAnswers(eligible("8.95"));
+        List<Callable<ResponseEntity<String>>> requests = IntStream.range(0, 10)
+                .<Callable<ResponseEntity<String>>>mapToObj(
+                        i -> () -> create("same-key", requestJson("1012AB", 2000 + i, "NL")))
+                .toList();
+
+        List<ResponseEntity<String>> responses;
+        try (ExecutorService executor = Executors.newFixedThreadPool(10)) {
+            responses = executor.invokeAll(requests).stream().map(DeliveryOrderApiIT::resultOf).toList();
+        }
+
+        assertThat(responses).filteredOn(response -> response.getStatusCode() == HttpStatus.CREATED).hasSize(1);
+        assertThat(responses).filteredOn(response -> response.getStatusCode() == HttpStatus.CONFLICT).hasSize(9);
+        // The conflicts are found when binding the key, before Pricing is called: only the first request reaches it.
+        PRICING.verify(1, postRequestedFor(urlEqualTo(PRICING_PATH)));
         assertThat(count("delivery_order")).isEqualTo(1);
         assertThat(count("idempotency_record")).isEqualTo(1);
     }

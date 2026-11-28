@@ -10,7 +10,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Read model of an idempotency record. It is written once, by the insert in the repository. */
+/** Read model of an idempotency record. It is written by the bind insert and the outcome update in the repository. */
 @Entity
 @Table(name = "idempotency_record")
 public class IdempotencyRecordEntity {
@@ -22,8 +22,7 @@ public class IdempotencyRecordEntity {
     private String requestFingerprint;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private IdempotencyOutcome outcome;
+    private IdempotencyOutcome outcome;    // null until the request is decided
 
     private String rejectionCode;
 

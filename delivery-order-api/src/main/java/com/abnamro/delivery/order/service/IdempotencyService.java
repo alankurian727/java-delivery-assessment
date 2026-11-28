@@ -15,9 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Stores the final outcome of each Idempotency-Key and returns it for repeated requests (ADR-008). Nothing is
- * written before the outcome is known, so there is no in-progress state to recover. Recording joins the caller's
- * transaction when there is one.
+ * Binds each Idempotency-Key to the request it was first received with, records its outcome once, and returns that
+ * outcome for repeated requests (ADR-0010). A bound key without an outcome does not block anything, so there is no
+ * in-progress state, lease or take-over. Recording the outcome joins the caller's transaction when there is one.
  */
 @Service
 public class IdempotencyService {
@@ -33,19 +33,25 @@ public class IdempotencyService {
     }
 
     /**
-     * Returns the order ID stored for this key, or empty when the key is new. A stored rejection is returned by
-     * throwing it again; a different request under the same key is a conflict.
+     * Binds the key to this request's fingerprint when it is first seen, in its own short transaction, so concurrent
+     * and later requests see the binding before Pricing is called. Returns the stored order ID when the key already
+     * has a confirmed outcome, or empty when this request should be evaluated (new key, or bound but not decided yet,
+     * for example after Pricing was unavailable). A stored rejection is returned by throwing it again; a different
+     * request under the same key is a conflict, decided or not.
      */
-    @Transactional(readOnly = true)
-    public Optional<UUID> findPreviousOutcome(String key, String fingerprint) {
-        Optional<IdempotencyRecordEntity> existing = recordRepository.findById(key);
-        if (existing.isEmpty()) {
+    @Transactional
+    public Optional<UUID> bindOrFindOutcome(String key, String fingerprint) {
+        if (recordRepository.bindIfAbsent(key, fingerprint, clock.instant()) == 1) {
             return Optional.empty();
         }
-        IdempotencyRecordEntity record = existing.get();
+        IdempotencyRecordEntity record = recordRepository.findById(key)
+                .orElseThrow(() -> new IllegalStateException("Bound idempotency record not found"));
         if (!record.getRequestFingerprint().equals(fingerprint)) {
             logEvent("order.idempotency_conflict", null);
             throw new IdempotencyConflictException();
+        }
+        if (record.getOutcome() == null) {
+            return Optional.empty();
         }
         logEvent("order.previous_outcome_returned", record.getOutcome());
         if (record.getOutcome() == IdempotencyOutcome.REJECTED) {
@@ -55,21 +61,18 @@ public class IdempotencyService {
     }
 
     @Transactional
-    public void recordRejection(String key, String fingerprint, String rejectionCode) {
-        recordOutcome(key, fingerprint, IdempotencyOutcome.REJECTED, rejectionCode, null);
+    public void recordRejection(String key, String rejectionCode) {
+        recordOutcome(key, IdempotencyOutcome.REJECTED, rejectionCode, null);
     }
 
-    /** Throws {@link OutcomeAlreadyRecordedException} when another request recorded this key first. */
+    /** Throws {@link OutcomeAlreadyRecordedException} when another request decided this key first. */
     @Transactional
-    public void recordConfirmation(String key, String fingerprint, UUID orderId) {
-        recordOutcome(key, fingerprint, IdempotencyOutcome.CONFIRMED, null, orderId);
+    public void recordConfirmation(String key, UUID orderId) {
+        recordOutcome(key, IdempotencyOutcome.CONFIRMED, null, orderId);
     }
 
-    private void recordOutcome(String key, String fingerprint, IdempotencyOutcome outcome, String rejectionCode,
-                               UUID orderId) {
-        int inserted = recordRepository.insertIfAbsent(
-                key, fingerprint, outcome.name(), rejectionCode, orderId, clock.instant());
-        if (inserted == 0) {
+    private void recordOutcome(String key, IdempotencyOutcome outcome, String rejectionCode, UUID orderId) {
+        if (recordRepository.recordOutcome(key, outcome.name(), rejectionCode, orderId) == 0) {
             throw new OutcomeAlreadyRecordedException();
         }
     }
