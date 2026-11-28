@@ -180,7 +180,8 @@ Delivery Order's database tests start PostgreSQL with Testcontainers, so **Docke
 - **A rejection is final for its key.** A corrected or retried order uses a new `Idempotency-Key`.
 - **Idempotency keys are global**, because there is no authentication yet. In production they would be scoped per
   authenticated client.
-- **Not implemented:** authentication, the idempotency record clean-up job, distributed tracing, and Markdown copies of
-  the decision records in `docs/decisions/`.
+- **Not implemented:** authentication, the idempotency record clean-up job, exporting traces to a tracing backend
+  (trace and span IDs are logged and propagated, but spans are not sent anywhere), and Markdown copies of the
+  decision records in `docs/decisions/`.
 - **Database changes:** the schema is a single Flyway migration. If you ran an earlier version locally, recreate the
   database with `docker compose down -v`.

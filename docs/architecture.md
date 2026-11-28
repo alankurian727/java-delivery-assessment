@@ -200,7 +200,12 @@ erDiagram
 
 ## Observability
 
-- `X-Correlation-ID` is read or generated per request, put in the MDC, returned, and forwarded to Pricing.
+- `X-Correlation-ID` is read or generated per request, put in the MDC, returned, and forwarded to Pricing. It is the
+  business-facing ID a client can quote.
+- Micrometer Tracing (OpenTelemetry bridge) adds `traceId` and `spanId` to every log line and sends the W3C
+  `traceparent` header to Pricing, so one order has one trace ID in both services and a span ID per step. An incoming
+  `traceparent` is continued. Spans are not exported yet; add an exporter (for example OTLP) to see them in a tracing
+  backend.
 - Structured `event` log fields: `order.created`, `order.rejected`, `order.pricing_unavailable`,
   `order.previous_outcome_returned`, `order.idempotency_conflict`, `pricing.call_failed`, `pricing.call_retry`,
   `pricing.circuit_state_changed`. Names, postcodes and request bodies are never logged.

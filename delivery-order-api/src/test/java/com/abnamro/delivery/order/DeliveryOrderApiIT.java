@@ -2,6 +2,7 @@ package com.abnamro.delivery.order;
 
 import static com.abnamro.delivery.order.fixture.TestOrders.requestJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
@@ -11,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
+import com.github.tomakehurst.wiremock.client.WireMock;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -64,6 +66,22 @@ class DeliveryOrderApiIT extends IntegrationTest {
 
         assertThat(count("delivery_order")).isEqualTo(1);
         assertThat(output).doesNotContain("Test Sender").doesNotContain("Test Recipient");
+    }
+
+    @Test
+    void sendsTheTraceAndCorrelationIdToPricing() {
+        pricingAnswers(eligible("8.95"));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Idempotency-Key", "key-1");
+        headers.set("X-Correlation-ID", "test-correlation-id");
+
+        restTemplate.postForEntity(ORDERS, new HttpEntity<>(requestJson(), headers), String.class);
+
+        // W3C trace context: version-traceId(32 hex)-spanId(16 hex)-flags
+        PRICING.verify(postRequestedFor(urlEqualTo(PRICING_PATH))
+                .withHeader("traceparent", matching("00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]"))
+                .withHeader("X-Correlation-ID", WireMock.equalTo("test-correlation-id")));
     }
 
     @Test
