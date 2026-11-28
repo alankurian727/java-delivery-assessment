@@ -214,6 +214,8 @@ class DeliveryOrderApiIT extends IntegrationTest {
 
         assertThat(responses).filteredOn(response -> response.getStatusCode() == HttpStatus.CREATED).hasSize(1);
         assertThat(responses).filteredOn(response -> response.getStatusCode() == HttpStatus.CONFLICT).hasSize(9);
+        // The conflicts are found when binding the key, before Pricing is called: only the first request reaches it.
+        PRICING.verify(1, postRequestedFor(urlEqualTo(PRICING_PATH)));
         assertThat(count("delivery_order")).isEqualTo(1);
         assertThat(count("idempotency_record")).isEqualTo(1);
     }
