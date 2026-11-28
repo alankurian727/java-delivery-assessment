@@ -63,7 +63,7 @@ class DeliveryOrderServiceTest {
     @Test
     void returnsAnExistingOrderWithoutCallingPricing() {
         UUID orderId = UUID.randomUUID();
-        when(idempotencyService.bindKey(eq(KEY), anyString())).thenReturn(Optional.of(orderId));
+        when(idempotencyService.bindOrFindOutcome(eq(KEY), anyString())).thenReturn(Optional.of(orderId));
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(storedOrder(orderId)));
 
         DeliveryOrder order = service.createOrder(KEY, orderRequest());
@@ -110,7 +110,7 @@ class DeliveryOrderServiceTest {
     @Test
     void answersWithTheWinnersOrderWhenAConcurrentRequestRecordedTheKeyFirst() {
         UUID winnerOrderId = UUID.randomUUID();
-        when(idempotencyService.bindKey(eq(KEY), anyString()))
+        when(idempotencyService.bindOrFindOutcome(eq(KEY), anyString()))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(winnerOrderId));
         when(pricingClient.evaluate(any(), any())).thenAnswer(call -> PricingDecision.eligible(call.getArgument(0), PRICE));

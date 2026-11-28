@@ -40,7 +40,7 @@ public class IdempotencyService {
      * request under the same key is a conflict, decided or not.
      */
     @Transactional
-    public Optional<UUID> bindKey(String key, String fingerprint) {
+    public Optional<UUID> bindOrFindOutcome(String key, String fingerprint) {
         if (recordRepository.bindIfAbsent(key, fingerprint, clock.instant()) == 1) {
             return Optional.empty();
         }

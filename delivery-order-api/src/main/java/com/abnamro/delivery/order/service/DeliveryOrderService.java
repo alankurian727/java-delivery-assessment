@@ -51,7 +51,7 @@ public class DeliveryOrderService {
 
     public DeliveryOrder createOrder(String idempotencyKey, OrderRequest request) {
         String fingerprint = requestFingerprint.compute(request);
-        Optional<UUID> existingOrderId = idempotencyService.bindKey(idempotencyKey, fingerprint);
+        Optional<UUID> existingOrderId = idempotencyService.bindOrFindOutcome(idempotencyKey, fingerprint);
         if (existingOrderId.isPresent()) {
             return retrieveOrder(existingOrderId.get());
         }
@@ -59,7 +59,7 @@ public class DeliveryOrderService {
             return evaluateNewOrder(idempotencyKey, request);
         } catch (OutcomeAlreadyRecordedException e) {
             // A concurrent request with the same key decided it first: answer with that outcome.
-            return idempotencyService.bindKey(idempotencyKey, fingerprint)
+            return idempotencyService.bindOrFindOutcome(idempotencyKey, fingerprint)
                     .map(this::retrieveOrder)
                     .orElseThrow(() -> new IllegalStateException("Recorded outcome not found"));
         }

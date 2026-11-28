@@ -33,7 +33,7 @@ class IdempotencyServiceTest {
     void newKeyIsBoundAndEvaluated() {
         when(recordRepository.bindIfAbsent(KEY, FINGERPRINT, NOW)).thenReturn(1);
 
-        assertThat(service.bindKey(KEY, FINGERPRINT)).isEmpty();
+        assertThat(service.bindOrFindOutcome(KEY, FINGERPRINT)).isEmpty();
         verify(recordRepository).bindIfAbsent(KEY, FINGERPRINT, NOW);
     }
 
@@ -42,14 +42,14 @@ class IdempotencyServiceTest {
         // For example after Pricing was unavailable, or after a crash before the decision.
         bound(record(FINGERPRINT, null, null, null));
 
-        assertThat(service.bindKey(KEY, FINGERPRINT)).isEmpty();
+        assertThat(service.bindOrFindOutcome(KEY, FINGERPRINT)).isEmpty();
     }
 
     @Test
     void differentRequestOnABoundUndecidedKeyIsAConflict() {
         bound(record("other-fingerprint", null, null, null));
 
-        assertThatThrownBy(() -> service.bindKey(KEY, FINGERPRINT)).isInstanceOf(IdempotencyConflictException.class);
+        assertThatThrownBy(() -> service.bindOrFindOutcome(KEY, FINGERPRINT)).isInstanceOf(IdempotencyConflictException.class);
     }
 
     @Test
@@ -57,14 +57,14 @@ class IdempotencyServiceTest {
         UUID orderId = UUID.randomUUID();
         bound(record(FINGERPRINT, IdempotencyOutcome.CONFIRMED, null, orderId));
 
-        assertThat(service.bindKey(KEY, FINGERPRINT)).contains(orderId);
+        assertThat(service.bindOrFindOutcome(KEY, FINGERPRINT)).contains(orderId);
     }
 
     @Test
     void rejectedKeyReturnsTheRejection() {
         bound(record(FINGERPRINT, IdempotencyOutcome.REJECTED, "WEIGHT_LIMIT_EXCEEDED", null));
 
-        assertThatThrownBy(() -> service.bindKey(KEY, FINGERPRINT))
+        assertThatThrownBy(() -> service.bindOrFindOutcome(KEY, FINGERPRINT))
                 .isInstanceOf(DeliveryRejectedException.class)
                 .extracting("rejectionCode").isEqualTo("WEIGHT_LIMIT_EXCEEDED");
     }
@@ -73,7 +73,7 @@ class IdempotencyServiceTest {
     void differentRequestOnADecidedKeyIsAConflict() {
         bound(record("other-fingerprint", IdempotencyOutcome.CONFIRMED, null, UUID.randomUUID()));
 
-        assertThatThrownBy(() -> service.bindKey(KEY, FINGERPRINT)).isInstanceOf(IdempotencyConflictException.class);
+        assertThatThrownBy(() -> service.bindOrFindOutcome(KEY, FINGERPRINT)).isInstanceOf(IdempotencyConflictException.class);
     }
 
     @Test

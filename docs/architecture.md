@@ -43,7 +43,7 @@ sequenceDiagram
     API->>API: Bean Validation, normalise postcode and country
     API->>S: createOrder(key, request)
     S->>S: fingerprint = SHA-256 of normalised request
-    S->>I: bindKey(key, fingerprint)
+    S->>I: bindOrFindOutcome(key, fingerprint)
     I->>DB: INSERT idempotency_record (key, fingerprint) ON CONFLICT DO NOTHING, COMMIT
     alt key bound to a different request
         I-->>S: conflict
@@ -154,8 +154,8 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant B as Request B (same key)
 
-    A->>DB: bindKey: INSERT record (key, fingerprint), 1 row
-    B->>DB: bindKey: INSERT record, 0 rows; same fingerprint, no outcome yet
+    A->>DB: bindOrFindOutcome: INSERT record (key, fingerprint), 1 row
+    B->>DB: bindOrFindOutcome: INSERT record, 0 rows; same fingerprint, no outcome yet
     Note over A,B: both call Pricing (stateless, harmless)
     A->>DB: BEGIN, INSERT order A, UPDATE record WHERE outcome IS NULL (1 row)
     B->>DB: BEGIN, INSERT order B, UPDATE record WHERE outcome IS NULL
@@ -163,7 +163,7 @@ sequenceDiagram
     A->>DB: COMMIT
     DB-->>B: re-checked: outcome is set, 0 rows
     B->>DB: ROLLBACK (order B discarded)
-    B->>DB: bindKey: order A
+    B->>DB: bindOrFindOutcome: order A
     Note over A,B: both clients receive 201 with order A
 ```
 
