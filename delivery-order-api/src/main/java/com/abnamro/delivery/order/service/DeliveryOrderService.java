@@ -10,14 +10,9 @@ import com.abnamro.delivery.order.pricing.PricingClient;
 import com.abnamro.delivery.order.pricing.PricingDecision;
 import com.abnamro.delivery.order.repository.DeliveryOrderEntity;
 import com.abnamro.delivery.order.repository.DeliveryOrderRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -40,22 +35,22 @@ public class DeliveryOrderService {
     private final PricingClient pricingClient;
     private final DeliveryOrderRepository orderRepository;
     private final TransactionTemplate transactionTemplate;
-    private final ObjectMapper objectMapper;
+    private final RequestFingerprint requestFingerprint;
     private final Clock clock;
 
     public DeliveryOrderService(IdempotencyService idempotencyService, PricingClient pricingClient,
                                 DeliveryOrderRepository orderRepository, TransactionTemplate transactionTemplate,
-                                ObjectMapper objectMapper, Clock clock) {
+                                RequestFingerprint requestFingerprint, Clock clock) {
         this.idempotencyService = idempotencyService;
         this.pricingClient = pricingClient;
         this.orderRepository = orderRepository;
         this.transactionTemplate = transactionTemplate;
-        this.objectMapper = objectMapper;
+        this.requestFingerprint = requestFingerprint;
         this.clock = clock;
     }
 
     public DeliveryOrder createOrder(String idempotencyKey, OrderRequest request) {
-        String fingerprint = computeFingerprint(request);
+        String fingerprint = requestFingerprint.compute(request);
         Optional<UUID> existingOrderId = idempotencyService.findPreviousOutcome(idempotencyKey, fingerprint);
         if (existingOrderId.isPresent()) {
             return retrieveOrder(existingOrderId.get());
@@ -131,16 +126,6 @@ public class DeliveryOrderService {
         return orderRepository.findById(orderId)
                 .map(DeliveryOrderEntity::toDomain)
                 .orElseThrow(OrderNotFoundException::new);
-    }
-
-    /** SHA-256 of the normalised request, so equivalent requests (for example "1012 ab" and "1012AB") match. */
-    private String computeFingerprint(OrderRequest request) {
-        try {
-            byte[] requestJson = objectMapper.writeValueAsBytes(request);
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(requestJson));
-        } catch (JsonProcessingException | NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Could not fingerprint the request", e);
-        }
     }
 
     private static void logRejection(String rejectionCode, UUID pricingRequestId) {

@@ -9,7 +9,6 @@ import com.abnamro.delivery.order.domain.PostalCode;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.Locale;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
@@ -28,10 +27,9 @@ public interface DeliveryOrderApiMapper {
     @Mapping(target = "status", constant = "CONFIRMED")
     ConfirmedOrder toConfirmedOrder(DeliveryOrder order);
 
-    /** Normalises the postal code and country code, so equivalent requests compare equal. */
+    /** PostalCode and Party normalise their values, so equivalent requests compare equal. */
     default Party toParty(com.abnamro.delivery.order.api.model.Party party) {
-        return new Party(party.getName(), PostalCode.of(party.getPostalCode()),
-                party.getCountryCode().toUpperCase(Locale.ROOT));
+        return new Party(party.getName(), PostalCode.of(party.getPostalCode()), party.getCountryCode());
     }
 
     /** Stored in UTC; shown with the Europe/Amsterdam offset. */
