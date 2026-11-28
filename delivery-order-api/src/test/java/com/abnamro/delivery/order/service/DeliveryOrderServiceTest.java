@@ -9,7 +9,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -17,9 +16,6 @@ import static org.mockito.Mockito.when;
 import com.abnamro.delivery.order.domain.DeliveryOrder;
 import com.abnamro.delivery.order.domain.DeliveryType;
 import com.abnamro.delivery.order.domain.Money;
-import com.abnamro.delivery.order.domain.OrderRequest;
-import com.abnamro.delivery.order.domain.Party;
-import com.abnamro.delivery.order.domain.PostalCode;
 import com.abnamro.delivery.order.exception.DeliveryRejectedException;
 import com.abnamro.delivery.order.exception.OrderNotFoundException;
 import com.abnamro.delivery.order.exception.OutcomeAlreadyRecordedException;
@@ -36,7 +32,6 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -50,7 +45,7 @@ class DeliveryOrderServiceTest {
     private final PricingClient pricingClient = mock(PricingClient.class);
     private final DeliveryOrderRepository orderRepository = mock(DeliveryOrderRepository.class);
     private final DeliveryOrderService service = new DeliveryOrderService(idempotencyService, pricingClient,
-            orderRepository, new TransactionTemplate(mock(PlatformTransactionManager.class)), new ObjectMapper(),
+            orderRepository, new TransactionTemplate(mock(PlatformTransactionManager.class)), new RequestFingerprint(new ObjectMapper()),
             Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
@@ -127,26 +122,6 @@ class DeliveryOrderServiceTest {
         DeliveryOrder order = service.createOrder(KEY, orderRequest());
 
         assertThat(order.id()).isEqualTo(winnerOrderId);
-    }
-
-    @Test
-    void equivalentRequestsHaveTheSameFingerprintAndDifferentOnesDoNot() {
-        when(pricingClient.evaluate(any(), any())).thenThrow(new PricingUnavailableException("timeout"));
-        OrderRequest sameAgain = orderRequest();
-        OrderRequest heavier = new OrderRequest("CUSTOMER-TEST-001",
-                new Party("Test Sender", PostalCode.of("1012 ab"), "NL"),
-                new Party("Test Recipient", PostalCode.of("5611EM"), "NL"), 3000, DeliveryType.NEXT_DAY);
-
-        ArgumentCaptor<String> fingerprints = ArgumentCaptor.forClass(String.class);
-        for (OrderRequest request : new OrderRequest[] {orderRequest(), sameAgain, heavier}) {
-            assertThatThrownBy(() -> service.createOrder(KEY, request)).isInstanceOf(PricingUnavailableException.class);
-        }
-        verify(idempotencyService, times(3)).findPreviousOutcome(eq(KEY), fingerprints.capture());
-
-        assertThat(fingerprints.getAllValues().get(0))
-                .hasSize(64)
-                .isEqualTo(fingerprints.getAllValues().get(1))
-                .isNotEqualTo(fingerprints.getAllValues().get(2));
     }
 
     @Test
