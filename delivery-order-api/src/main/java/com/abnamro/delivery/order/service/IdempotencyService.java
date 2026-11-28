@@ -34,16 +34,24 @@ public class IdempotencyService {
 
     /**
      * Binds the key to this request's fingerprint when it is first seen, in its own short transaction, so concurrent
-     * and later requests see the binding before Pricing is called. Returns the stored order ID when the key already
-     * has a confirmed outcome, or empty when this request should be evaluated (new key, or bound but not decided yet,
-     * for example after Pricing was unavailable). A stored rejection is returned by throwing it again; a different
-     * request under the same key is a conflict, decided or not.
+     * and later requests see the binding before Pricing is called. A key that is already bound is read with
+     * {@link #findOutcome}.
      */
     @Transactional
     public Optional<UUID> bindOrFindOutcome(String key, String fingerprint) {
         if (recordRepository.bindIfAbsent(key, fingerprint, clock.instant()) == 1) {
             return Optional.empty();
         }
+        return findOutcome(key, fingerprint);
+    }
+
+    /**
+     * Reads a bound key. Returns the stored order ID when the key has a confirmed outcome, or empty when this request
+     * should be evaluated (bound but not decided yet, for example after Pricing was unavailable). A stored rejection
+     * is returned by throwing it again; a different request under the same key is a conflict, decided or not.
+     */
+    @Transactional(readOnly = true)
+    public Optional<UUID> findOutcome(String key, String fingerprint) {
         IdempotencyRecordEntity record = recordRepository.findById(key)
                 .orElseThrow(() -> new IllegalStateException("Bound idempotency record not found"));
         if (!record.getRequestFingerprint().equals(fingerprint)) {

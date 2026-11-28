@@ -2,7 +2,9 @@ package com.abnamro.delivery.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -74,6 +76,16 @@ class IdempotencyServiceTest {
         bound(record("other-fingerprint", IdempotencyOutcome.CONFIRMED, null, UUID.randomUUID()));
 
         assertThatThrownBy(() -> service.bindOrFindOutcome(KEY, FINGERPRINT)).isInstanceOf(IdempotencyConflictException.class);
+    }
+
+    @Test
+    void findingAnOutcomeDoesNotBindTheKey() {
+        UUID orderId = UUID.randomUUID();
+        IdempotencyRecordEntity record = record(FINGERPRINT, IdempotencyOutcome.CONFIRMED, null, orderId);
+        when(recordRepository.findById(KEY)).thenReturn(Optional.of(record));
+
+        assertThat(service.findOutcome(KEY, FINGERPRINT)).contains(orderId);
+        verify(recordRepository, never()).bindIfAbsent(any(), any(), any());
     }
 
     @Test

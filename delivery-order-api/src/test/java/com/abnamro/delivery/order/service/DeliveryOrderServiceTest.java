@@ -110,9 +110,8 @@ class DeliveryOrderServiceTest {
     @Test
     void answersWithTheWinnersOrderWhenAConcurrentRequestRecordedTheKeyFirst() {
         UUID winnerOrderId = UUID.randomUUID();
-        when(idempotencyService.bindOrFindOutcome(eq(KEY), anyString()))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(winnerOrderId));
+        when(idempotencyService.bindOrFindOutcome(eq(KEY), anyString())).thenReturn(Optional.empty());
+        when(idempotencyService.findOutcome(eq(KEY), anyString())).thenReturn(Optional.of(winnerOrderId));
         when(pricingClient.evaluate(any(), any())).thenAnswer(call -> PricingDecision.eligible(call.getArgument(0), PRICE));
         when(orderRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
         doThrow(new OutcomeAlreadyRecordedException())
@@ -122,6 +121,7 @@ class DeliveryOrderServiceTest {
         DeliveryOrder order = service.createOrder(KEY, orderRequest());
 
         assertThat(order.id()).isEqualTo(winnerOrderId);
+        verify(idempotencyService).bindOrFindOutcome(eq(KEY), anyString()); // bound once, not again on the retry
     }
 
     @Test

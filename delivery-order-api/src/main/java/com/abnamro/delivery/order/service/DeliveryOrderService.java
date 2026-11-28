@@ -59,7 +59,7 @@ public class DeliveryOrderService {
             return evaluateNewOrder(idempotencyKey, request);
         } catch (OutcomeAlreadyRecordedException e) {
             // A concurrent request with the same key decided it first: answer with that outcome.
-            return idempotencyService.bindOrFindOutcome(idempotencyKey, fingerprint)
+            return idempotencyService.findOutcome(idempotencyKey, fingerprint)
                     .map(this::retrieveOrder)
                     .orElseThrow(() -> new IllegalStateException("Recorded outcome not found"));
         }
