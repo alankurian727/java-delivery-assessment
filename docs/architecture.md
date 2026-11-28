@@ -64,7 +64,7 @@ sequenceDiagram
             S->>DB: UPDATE idempotency_record SET REJECTED WHERE outcome IS NULL
             S-->>C: 422 orderStatus REJECTED
         else Pricing unavailable
-            S-->>C: 503 PRICING_UNAVAILABLE, Retry-After 5; key stays bound, no outcome
+            S-->>C: 503 PRICING_UNAVAILABLE, Retry-After 5, key stays bound without outcome
         end
     end
 ```
@@ -155,7 +155,7 @@ sequenceDiagram
     participant B as Request B (same key)
 
     A->>DB: bindOrFindOutcome: INSERT record (key, fingerprint), 1 row
-    B->>DB: bindOrFindOutcome: INSERT record, 0 rows; same fingerprint, no outcome yet
+    B->>DB: bindOrFindOutcome: INSERT record, 0 rows, same fingerprint, no outcome yet
     Note over A,B: both call Pricing (stateless, harmless)
     A->>DB: BEGIN, INSERT order A, UPDATE record WHERE outcome IS NULL (1 row)
     B->>DB: BEGIN, INSERT order B, UPDATE record WHERE outcome IS NULL
