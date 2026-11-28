@@ -174,6 +174,52 @@ coverage report per service to `target/site/jacoco/index.html`.
 
 Delivery Order's database tests start PostgreSQL with Testcontainers, so **Docker must be running**.
 
+## Privacy and GDPR
+
+Delivery Order processes personal data (sender and recipient names and postal codes), so the GDPR (AVG in the
+Netherlands) applies. Items marked *proposal* are not implemented in this assessment.
+
+**Data minimisation and purpose limitation**
+
+- Delivery Order stores only what a delivery needs: sender and recipient name, postal code and country, parcel weight,
+  delivery type, `customerReference` and the confirmed price. No street address, phone number, email or date of birth
+  is collected.
+- Pricing receives no names: only postal codes, weight and delivery type.
+- The data is used to price, confirm and carry out the delivery, nothing else. Idempotency records keep a SHA-256
+  fingerprint of the request, not the request itself.
+- Error responses never echo submitted values.
+
+**Retention**
+
+- Orders are kept as long as the delivery and legal obligations require. The confirmed price is a financial record,
+  which under Dutch tax law generally has to be kept for 7 years; confirm the exact period with legal advice.
+- Names are not needed for that record, so they can be anonymised once the delivery period is over (*proposal*: a
+  scheduled job).
+- Idempotency records are only needed while a client may retry and get their own short retention period
+  ([idempotency record retention](docs/improvements/idempotency-record-retention.md), *proposal*).
+
+**Right to erasure**
+
+- On request, the names on a customer's orders are removed or anonymised (*proposal*: an erasure process).
+- Where a legal retention obligation applies (GDPR Article 17(3)(b)), the order and its price are kept without the
+  names.
+- The idempotency record references the order, so it is deleted before an order itself is deleted.
+
+**Auditability without unnecessary personal data**
+
+- Events are traced by technical identifiers only: `orderId`, `pricingRequestId`, `correlationId`, `traceId`, and in
+  production the client ID from the access token
+  ([production authentication](docs/improvements/authentication.md)).
+
+**Observability without leaking personal data**
+
+- Logs never contain names, postal codes, request bodies or the `Authorization` header; a test checks that names do
+  not appear in the log output.
+- Database errors leave out row values (`logServerErrorDetail=false`); a test checks that a constraint violation does
+  not expose names or postal codes.
+- Internal errors return a generic `500 INTERNAL_ERROR` without stack traces or internal details.
+- All test data and examples are fictional.
+
 ## Assumptions and known limitations
 
 - **Orders exist only when eligible.** Rejected and Pricing-unavailable outcomes are reported in the POST response
