@@ -163,7 +163,7 @@ sequenceDiagram
     A->>DB: COMMIT
     DB-->>B: re-checked: outcome is set, 0 rows
     B->>DB: ROLLBACK (order B discarded)
-    B->>DB: bindOrFindOutcome: order A
+    B->>DB: findOutcome: order A
     Note over A,B: both clients receive 201 with order A
 ```
 
