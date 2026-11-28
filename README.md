@@ -25,7 +25,7 @@ when it is eligible.
 | Same key with a different request | `409 IDEMPOTENCY_CONFLICT` |
 | Not eligible (weight above 20 kg, same-day between postcode areas, country other than NL) | `422` with the rejection code; no order is created; repeating the request returns the same `422` |
 | Invalid input or missing `Idempotency-Key` | `400 VALIDATION_FAILED` |
-| Pricing slow, failing or returning an invalid answer | `503 PRICING_UNAVAILABLE` with `Retry-After: 5`; nothing is stored, so retry with the same key |
+| Pricing slow, failing or returning an invalid answer | `503 PRICING_UNAVAILABLE` with `Retry-After: 5`; no order is created and the key stays bound to this request, so retry the same request with the same key |
 | `GET` an order | The stored order and price, without calling Pricing; unknown ID gives `404 ORDER_NOT_FOUND` |
 
 Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details with a `code` and a `correlationId`.

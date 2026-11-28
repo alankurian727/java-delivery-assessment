@@ -2,9 +2,6 @@ package com.abnamro.delivery.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,69 +30,83 @@ class IdempotencyServiceTest {
             new IdempotencyService(recordRepository, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
-    void newKeyHasNoPreviousOutcome() {
-        when(recordRepository.findById(KEY)).thenReturn(Optional.empty());
+    void newKeyIsBoundAndEvaluated() {
+        when(recordRepository.bindIfAbsent(KEY, FINGERPRINT, NOW)).thenReturn(1);
 
-        assertThat(service.findPreviousOutcome(KEY, FINGERPRINT)).isEmpty();
+        assertThat(service.bindKey(KEY, FINGERPRINT)).isEmpty();
+        verify(recordRepository).bindIfAbsent(KEY, FINGERPRINT, NOW);
+    }
+
+    @Test
+    void sameRequestOnABoundUndecidedKeyIsEvaluatedAgain() {
+        // For example after Pricing was unavailable, or after a crash before the decision.
+        bound(record(FINGERPRINT, null, null, null));
+
+        assertThat(service.bindKey(KEY, FINGERPRINT)).isEmpty();
+    }
+
+    @Test
+    void differentRequestOnABoundUndecidedKeyIsAConflict() {
+        bound(record("other-fingerprint", null, null, null));
+
+        assertThatThrownBy(() -> service.bindKey(KEY, FINGERPRINT)).isInstanceOf(IdempotencyConflictException.class);
     }
 
     @Test
     void confirmedKeyReturnsItsOrder() {
         UUID orderId = UUID.randomUUID();
-        IdempotencyRecordEntity confirmed = record(FINGERPRINT, IdempotencyOutcome.CONFIRMED, null, orderId);
-        when(recordRepository.findById(KEY)).thenReturn(Optional.of(confirmed));
+        bound(record(FINGERPRINT, IdempotencyOutcome.CONFIRMED, null, orderId));
 
-        assertThat(service.findPreviousOutcome(KEY, FINGERPRINT)).contains(orderId);
+        assertThat(service.bindKey(KEY, FINGERPRINT)).contains(orderId);
     }
 
     @Test
     void rejectedKeyReturnsTheRejection() {
-        IdempotencyRecordEntity rejected =
-                record(FINGERPRINT, IdempotencyOutcome.REJECTED, "WEIGHT_LIMIT_EXCEEDED", null);
-        when(recordRepository.findById(KEY)).thenReturn(Optional.of(rejected));
+        bound(record(FINGERPRINT, IdempotencyOutcome.REJECTED, "WEIGHT_LIMIT_EXCEEDED", null));
 
-        assertThatThrownBy(() -> service.findPreviousOutcome(KEY, FINGERPRINT))
+        assertThatThrownBy(() -> service.bindKey(KEY, FINGERPRINT))
                 .isInstanceOf(DeliveryRejectedException.class)
                 .extracting("rejectionCode").isEqualTo("WEIGHT_LIMIT_EXCEEDED");
     }
 
     @Test
-    void differentRequestWithSameKeyIsAConflict() {
-        IdempotencyRecordEntity otherRequest =
-                record("other-fingerprint", IdempotencyOutcome.CONFIRMED, null, UUID.randomUUID());
-        when(recordRepository.findById(KEY)).thenReturn(Optional.of(otherRequest));
+    void differentRequestOnADecidedKeyIsAConflict() {
+        bound(record("other-fingerprint", IdempotencyOutcome.CONFIRMED, null, UUID.randomUUID()));
 
-        assertThatThrownBy(() -> service.findPreviousOutcome(KEY, FINGERPRINT))
-                .isInstanceOf(IdempotencyConflictException.class);
+        assertThatThrownBy(() -> service.bindKey(KEY, FINGERPRINT)).isInstanceOf(IdempotencyConflictException.class);
     }
 
     @Test
     void recordsAConfirmation() {
         UUID orderId = UUID.randomUUID();
-        when(recordRepository.insertIfAbsent(KEY, FINGERPRINT, "CONFIRMED", null, orderId, NOW)).thenReturn(1);
+        when(recordRepository.recordOutcome(KEY, "CONFIRMED", null, orderId)).thenReturn(1);
 
-        service.recordConfirmation(KEY, FINGERPRINT, orderId);
+        service.recordConfirmation(KEY, orderId);
 
-        verify(recordRepository).insertIfAbsent(KEY, FINGERPRINT, "CONFIRMED", null, orderId, NOW);
+        verify(recordRepository).recordOutcome(KEY, "CONFIRMED", null, orderId);
     }
 
     @Test
     void recordsARejection() {
-        when(recordRepository.insertIfAbsent(KEY, FINGERPRINT, "REJECTED", "UNSUPPORTED_COUNTRY", null, NOW))
-                .thenReturn(1);
+        when(recordRepository.recordOutcome(KEY, "REJECTED", "UNSUPPORTED_COUNTRY", null)).thenReturn(1);
 
-        service.recordRejection(KEY, FINGERPRINT, "UNSUPPORTED_COUNTRY");
+        service.recordRejection(KEY, "UNSUPPORTED_COUNTRY");
 
-        verify(recordRepository).insertIfAbsent(KEY, FINGERPRINT, "REJECTED", "UNSUPPORTED_COUNTRY", null, NOW);
+        verify(recordRepository).recordOutcome(KEY, "REJECTED", "UNSUPPORTED_COUNTRY", null);
     }
 
     @Test
-    void keyAlreadyRecordedByAnotherRequestIsReported() {
-        when(recordRepository.insertIfAbsent(eq(KEY), eq(FINGERPRINT), eq("CONFIRMED"), isNull(), any(), any()))
-                .thenReturn(0);
+    void keyAlreadyDecidedByAnotherRequestIsReported() {
+        UUID orderId = UUID.randomUUID();
+        when(recordRepository.recordOutcome(KEY, "CONFIRMED", null, orderId)).thenReturn(0);
 
-        assertThatThrownBy(() -> service.recordConfirmation(KEY, FINGERPRINT, UUID.randomUUID()))
+        assertThatThrownBy(() -> service.recordConfirmation(KEY, orderId))
                 .isInstanceOf(OutcomeAlreadyRecordedException.class);
+    }
+
+    private void bound(IdempotencyRecordEntity record) {
+        when(recordRepository.bindIfAbsent(KEY, FINGERPRINT, NOW)).thenReturn(0);
+        when(recordRepository.findById(KEY)).thenReturn(Optional.of(record));
     }
 
     private static IdempotencyRecordEntity record(String fingerprint, IdempotencyOutcome outcome,

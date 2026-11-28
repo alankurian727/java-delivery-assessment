@@ -44,6 +44,23 @@ class SchemaConstraintsIT extends IntegrationTest {
     }
 
     @Test
+    void refusesAnUndecidedRecordWithAResult() {
+        UUID orderId = UUID.randomUUID();
+        jdbc.update(INSERT_ORDER, orderId, 2750, new BigDecimal("8.95"));
+
+        assertRefused(() -> jdbc.update(INSERT_RECORD, "key-1", null, null, orderId), "undecided_has_no_result");
+        assertRefused(() -> jdbc.update(INSERT_RECORD, "key-2", null, "WEIGHT_LIMIT_EXCEEDED", null),
+                "undecided_has_no_result");
+    }
+
+    @Test
+    void acceptsABoundKeyWithoutAnOutcome() {
+        jdbc.update(INSERT_RECORD, "key-1", null, null, null);
+
+        assertThat(count("idempotency_record")).isEqualTo(1);
+    }
+
+    @Test
     void refusesARecordForAnOrderThatDoesNotExist() {
         assertRefused(() -> jdbc.update(INSERT_RECORD, "key-1", "CONFIRMED", null, UUID.randomUUID()),
                 "idempotency_record_order_id_fkey");

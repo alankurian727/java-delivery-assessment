@@ -57,13 +57,13 @@ class DeliveryOrderServiceTest {
 
         assertThat(order.price()).isEqualTo(PRICE);
         assertThat(order.createdAt()).isEqualTo(NOW);
-        verify(idempotencyService).recordConfirmation(eq(KEY), anyString(), eq(order.id()));
+        verify(idempotencyService).recordConfirmation(eq(KEY), eq(order.id()));
     }
 
     @Test
     void returnsAnExistingOrderWithoutCallingPricing() {
         UUID orderId = UUID.randomUUID();
-        when(idempotencyService.findPreviousOutcome(eq(KEY), anyString())).thenReturn(Optional.of(orderId));
+        when(idempotencyService.bindKey(eq(KEY), anyString())).thenReturn(Optional.of(orderId));
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(storedOrder(orderId)));
 
         DeliveryOrder order = service.createOrder(KEY, orderRequest());
@@ -78,7 +78,7 @@ class DeliveryOrderServiceTest {
                 .isInstanceOf(DeliveryRejectedException.class)
                 .extracting("rejectionCode").isEqualTo("UNSUPPORTED_COUNTRY");
 
-        verify(idempotencyService).recordRejection(eq(KEY), anyString(), eq("UNSUPPORTED_COUNTRY"));
+        verify(idempotencyService).recordRejection(eq(KEY), eq("UNSUPPORTED_COUNTRY"));
         verifyNoInteractions(pricingClient);
     }
 
@@ -91,7 +91,7 @@ class DeliveryOrderServiceTest {
                 .isInstanceOf(DeliveryRejectedException.class)
                 .extracting("rejectionCode").isEqualTo("WEIGHT_LIMIT_EXCEEDED");
 
-        verify(idempotencyService).recordRejection(eq(KEY), anyString(), eq("WEIGHT_LIMIT_EXCEEDED"));
+        verify(idempotencyService).recordRejection(eq(KEY), eq("WEIGHT_LIMIT_EXCEEDED"));
         verify(orderRepository, never()).saveAndFlush(any());
     }
 
@@ -102,21 +102,21 @@ class DeliveryOrderServiceTest {
         assertThatThrownBy(() -> service.createOrder(KEY, orderRequest()))
                 .isInstanceOf(PricingUnavailableException.class);
 
-        verify(idempotencyService, never()).recordRejection(any(), any(), any());
-        verify(idempotencyService, never()).recordConfirmation(any(), any(), any());
+        verify(idempotencyService, never()).recordRejection(any(), any());
+        verify(idempotencyService, never()).recordConfirmation(any(), any());
         verify(orderRepository, never()).saveAndFlush(any());
     }
 
     @Test
     void answersWithTheWinnersOrderWhenAConcurrentRequestRecordedTheKeyFirst() {
         UUID winnerOrderId = UUID.randomUUID();
-        when(idempotencyService.findPreviousOutcome(eq(KEY), anyString()))
+        when(idempotencyService.bindKey(eq(KEY), anyString()))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(winnerOrderId));
         when(pricingClient.evaluate(any(), any())).thenAnswer(call -> PricingDecision.eligible(call.getArgument(0), PRICE));
         when(orderRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
         doThrow(new OutcomeAlreadyRecordedException())
-                .when(idempotencyService).recordConfirmation(eq(KEY), anyString(), any());
+                .when(idempotencyService).recordConfirmation(eq(KEY), any());
         when(orderRepository.findById(winnerOrderId)).thenReturn(Optional.of(storedOrder(winnerOrderId)));
 
         DeliveryOrder order = service.createOrder(KEY, orderRequest());

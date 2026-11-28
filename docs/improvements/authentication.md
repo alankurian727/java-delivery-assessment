@@ -92,8 +92,8 @@ Delivery Order is itself a registered OAuth client, with its own client ID and s
 
 | Situation | Result |
 | --- | --- |
-| Pricing rejects the token (401) | Delivery Order requests a new token and retries once; if it still fails, the order gets 503 `PRICING_UNAVAILABLE` and nothing is stored |
-| Identity provider unreachable when a token is needed | No token, no Pricing call: 503 `PRICING_UNAVAILABLE`, nothing stored (no false confirmation) |
+| Pricing rejects the token (401) | Delivery Order requests a new token and retries once; if it still fails, the order gets 503 `PRICING_UNAVAILABLE` and no order is created |
+| Identity provider unreachable when a token is needed | No token, no Pricing call: 503 `PRICING_UNAVAILABLE`, no order created (no false confirmation) |
 | A token is still cached | Pricing calls keep working while the identity provider is briefly down |
 
 **Why not only network rules or a shared secret:** being inside the network should not be enough to call Pricing. A

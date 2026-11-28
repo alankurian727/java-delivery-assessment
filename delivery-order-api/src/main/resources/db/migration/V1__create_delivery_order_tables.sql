@@ -21,15 +21,17 @@ CREATE TABLE delivery_order (
     created_at             TIMESTAMPTZ   NOT NULL
 );
 
--- The final outcome of each Idempotency-Key (ADR-008), written once and never updated, so repeated requests get the same answer.
--- The primary key allows one outcome per key across all instances.
+-- One row per Idempotency-Key (ADR-0010): bound to the request's fingerprint when the key is first received, then
+-- given its outcome once, when it is decided. Repeated requests get the same answer; a different request gets 409.
+-- The primary key allows one row per key across all instances.
 CREATE TABLE idempotency_record (
     idempotency_key     VARCHAR(128) PRIMARY KEY,
     request_fingerprint VARCHAR(64)  NOT NULL,
-    outcome             VARCHAR(20)  NOT NULL CONSTRAINT known_outcome CHECK (outcome IN ('CONFIRMED', 'REJECTED')),
+    outcome             VARCHAR(20)  CONSTRAINT known_outcome CHECK (outcome IN ('CONFIRMED', 'REJECTED')), -- NULL: not decided yet
     rejection_code      TEXT,         -- Pricing owns the codes, so new codes are stored as they are
     order_id            UUID         REFERENCES delivery_order (id),
     created_at          TIMESTAMPTZ  NOT NULL,
     CONSTRAINT confirmed_has_order      CHECK ((outcome = 'CONFIRMED') = (order_id IS NOT NULL)),
-    CONSTRAINT rejected_has_reason_code CHECK ((outcome = 'REJECTED') = (rejection_code IS NOT NULL))
+    CONSTRAINT rejected_has_reason_code CHECK ((outcome = 'REJECTED') = (rejection_code IS NOT NULL)),
+    CONSTRAINT undecided_has_no_result  CHECK (outcome IS NOT NULL OR (order_id IS NULL AND rejection_code IS NULL))
 );
