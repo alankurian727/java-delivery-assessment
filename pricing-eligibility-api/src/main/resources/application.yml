@@ -52,8 +52,3 @@ management:
     web:
       exposure:
         include: health,info,metrics
-  tracing:
-    sampling:
-      # Share of traces marked as sampled (exported once an exporter is added). Trace and span IDs are always logged
-      # and propagated. Lower this in production, for example to 0.1.
-      probability: 1.0
