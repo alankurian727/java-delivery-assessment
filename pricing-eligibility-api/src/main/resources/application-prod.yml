@@ -7,3 +7,8 @@ logging:
       console: ecs
   level:
     root: INFO
+management:
+  tracing:
+    sampling:
+      # Export 10% of traces once an exporter is added; trace and span IDs are still logged for every request.
+      probability: 0.1
